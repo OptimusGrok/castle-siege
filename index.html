@@ -280,12 +280,13 @@ function nearPad(x,z,r){return PADS.some(p=>Math.hypot(p.x-x,p.z-z)<r);}
 function clearSpot(x,z,rp,rpad){return distPath(x,z)>rp&&!nearPad(x,z,rpad)&&Math.hypot(x-KEEP.x,z-KEEP.z)>7*KEEPS;}
 const SCORCH=[[-20,-3,5],[2,-14,4],[12,3,4.5],[-9,14,5],[-25,13,4],[21,-12,4],[0,1,3.5],[-22,-16,3],[4,15,4],[-12,-1,3]];
 // ---------- ground ----------
+function moatD(x,z){if(x<-30&&Math.abs(z+11)<5.2)return 0;const f=Math.pow(Math.abs(x)/39.2,10)+Math.pow(Math.abs(z)/27.2,10);return Math.min(1,Math.max(0,(Math.pow(f,0.1)-1)*40));}
 (function ground(){const W=92,H=66,g=new THREE.PlaneGeometry(W,H,92,66);g.rotateX(-Math.PI/2);const p=g.attributes.position,col=new Float32Array(p.count*3);const c=new THREE.Color(),grass=new THREE.Color(0x4c5230),dirt=new THREE.Color(0x5e4a34),ash=new THREE.Color(0x1d1915),mud=new THREE.Color(0x3e3226);
  for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);const n=fbm(x*0.12,z*0.12);c.copy(grass).lerp(dirt,Math.min(1,Math.max(0,n*1.6-0.4)));
   const dp=distPath(x,z);if(dp<3)c.lerp(mud,(1-dp/3)*0.7);
   for(const s of SCORCH){const d=Math.hypot(x-s[0],z-s[1]);if(d<s[2])c.lerp(ash,(1-d/s[2])*(0.7+0.3*vnoise(x,z)));}
   const v=0.85+hash(x,z)*0.25;col[i*3]=c.r*v;col[i*3+1]=c.g*v;col[i*3+2]=c.b*v;
-  if(dp>3&&Math.abs(x)<29&&Math.abs(z)<18)p.setY(i,(n-0.5)*0.35);else if(dp>3)p.setY(i,(n-0.5)*0.8);}
+  if(dp>3&&Math.abs(x)<29&&Math.abs(z)<18)p.setY(i,(n-0.5)*0.35);else if(dp>3)p.setY(i,(n-0.5)*0.8);const md=moatD(x,z);if(md>0){p.setY(i,p.getY(i)*(1-md)-1.1*md);c.lerp(mud,md);col[i*3]=c.r*v;col[i*3+1]=c.g*v;col[i*3+2]=c.b*v;}}
  g.setAttribute('color',new THREE.BufferAttribute(col,3));g.computeVertexNormals();const outer=new THREE.Mesh(new THREE.PlaneGeometry(500,400).rotateX(-Math.PI/2),new THREE.MeshLambertMaterial({color:0x3a3324}));outer.position.y=-0.3;scene.add(outer);const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true}));m.receiveShadow=true;m.name='ground';scene.add(m);})();
 // path ribbon with procedural cobbles
 (function pathMesh(){
@@ -487,6 +488,47 @@ function dayUpdate(dt){DAY.t=(DAY.t+dt/DAY.period)%1;const a=DAY.t*Math.PI*2;// 
  for(const c of DAY.clouds){c.position.x+=c.userData.v*dt;if(c.position.x>230)c.position.x=-230;}
  DAY.caveGlow.intensity=e<0.1?Math.min(1,(0.1-e)*4)*30:0;
  DAY.acc+=dt;if(DAY.acc>0.6){DAY.acc=0;renderer.shadowMap.needsUpdate=true;}}
+
+// ---- 14_moat.js
+// ---------- moat: water ring at the foot of the cliffs, broken only by the cave causeway ----------
+(function moat(){let s=771;const r=()=>(s=(s*16807)%2147483647,(s-1)/2147483646);
+ const N=10,U=260,rows=[[39.6,27.6],[41.2,29.2],[43.6,31.6],[46.4,34.4]];
+ const se=(t,A,B)=>{const c=Math.cos(t),sn=Math.sin(t);return[A*Math.sign(c)*Math.pow(Math.abs(c),2/N),B*Math.sign(sn)*Math.pow(Math.abs(sn),2/N)];};
+ const gap=(x,z)=>x<-30&&Math.abs(z+11)<5.2;
+ const pos=[],uv=[],idx=[];for(let i=0;i<=U;i++){const t=i/U*Math.PI*2;rows.forEach((rw,j)=>{const w=j===0?0.35*(fbm(i*0.3,1)-0.5):0;const [x,z]=se(t,rw[0]+w,rw[1]+w);pos.push(x,-0.22,z);uv.push(j/(rows.length-1),i/U);});}
+ const R=rows.length;for(let i=0;i<U;i++){const t=(i+0.5)/U*Math.PI*2,[mx,mz]=se(t,42,30);if(gap(mx,mz))continue;for(let j=0;j<R-1;j++){const a=i*R+j,b=(i+1)*R+j;idx.push(a,a+1,b,b,a+1,b+1);}}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);
+ const un=THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{time:{value:0},sky:{value:new THREE.Color()},deep:{value:new THREE.Color()},sunDir:{value:new THREE.Vector3(0,1,0)},sunCol:{value:new THREE.Color()}}]);
+ const mat=new THREE.ShaderMaterial({uniforms:un,fog:true,transparent:true,depthWrite:false,side:THREE.DoubleSide,
+  vertexShader:`varying vec3 vW;varying vec2 vUv;
+#include <fog_pars_vertex>
+void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.0);vW=w.xyz;vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;
+#include <fog_vertex>
+}`,
+  fragmentShader:`uniform float time;uniform vec3 sky,deep,sunDir,sunCol;varying vec3 vW;varying vec2 vUv;
+#include <fog_pars_fragment>
+void main(){vec2 p=vW.xz;float t=time;
+ vec2 d=vec2(sin(p.x*0.9+t*1.3)+sin(p.y*1.3-t*0.9)*0.7+sin((p.x+p.y)*2.7+t*2.1)*0.3, cos(p.y*0.8+t*1.1)+cos(p.x*1.5-t*1.4)*0.6+cos((p.x-p.y)*3.1-t*1.7)*0.3);
+ vec3 n=normalize(vec3(d.x*0.12,1.0,d.y*0.12));vec3 v=normalize(cameraPosition-vW);
+ float fr=pow(1.0-max(dot(n,v),0.0),3.0)*0.7+0.12;vec3 col=mix(deep,sky,fr);
+ vec3 h=normalize(v+normalize(sunDir));col+=sunCol*pow(max(dot(n,h),0.0),120.0)*1.6;
+ float edge=smoothstep(0.0,0.12,vUv.x);col=mix(col*0.6+vec3(0.05,0.04,0.02),col,edge);
+ col+=vec3(0.6)*smoothstep(0.93,1.0,sin(p.x*3.0+d.x*2.0+t)*sin(p.y*3.0+d.y*2.0-t))*0.25*dot(sky,vec3(0.33));
+ gl_FragColor=vec4(col,0.9);
+#include <fog_fragment>
+}`});
+ const water=new THREE.Mesh(g,mat);water.renderOrder=2;water.receiveShadow=false;scene.add(water);
+ const sd=new THREE.Vector3();water.onBeforeRender=()=>{un.time.value=performance.now()/1000;const fc=scene.fog.color;un.sky.value.copy(fc).multiplyScalar(1.2).lerp(new THREE.Color(0.5,0.62,0.7),0.25);un.deep.value.setRGB(0.07,0.2,0.22).lerp(fc,0.4);
+  if(typeof sun!=='undefined'){sd.copy(sun.position).sub(sun.target.position).normalize();un.sunDir.value.copy(sd);un.sunCol.value.copy(sun.color).multiplyScalar(Math.min(1,sun.intensity)*(sd.y>0?1:0));}};
+ // stone/earth bank on the inner edge + reeds (one merged mesh each)
+ const bp=[],bc=[],c=new THREE.Color(),rp=[];const bank=new THREE.DodecahedronGeometry(1,0);const bq=bank.attributes.position;
+ for(let i=0;i<U*2;i++){const t=i/(U*2)*Math.PI*2;const [x,z]=se(t,39.4,27.4);if(gap(x,z))continue;const sc=0.45+r()*0.45,ry=r()*6;const cs=Math.cos(ry),sn=Math.sin(ry);const stone=r()<0.55;c.setHex(stone?0x80786c:0x5a4a32).multiplyScalar(0.8+r()*0.3);
+  for(let k=0;k<bq.count;k++){const px=bq.getX(k)*sc*1.3,py=bq.getY(k)*sc*0.45,pz=bq.getZ(k)*sc;bp.push(x+px*cs-pz*sn,0.08+py,z+px*sn+pz*cs);bc.push(c.r,c.g,c.b);}
+  if(r()<0.22){const [ox,oz]=se(t,40.6+r()*0.8,28.6+r()*0.8);for(let q=0;q<5;q++){const bx=ox+(r()-0.5)*0.8,bz=oz+(r()-0.5)*0.8,h=0.9+r()*1.1,lx=(r()-0.5)*0.4,lz=(r()-0.5)*0.4,w=0.05;rp.push(bx-w,0,bz,bx+w,0,bz,bx+lx,h,bz+lz, bx,0,bz-w,bx,0,bz+w,bx+lx,h,bz+lz);}}}
+ const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute(bp,3));bg.setAttribute('color',new THREE.Float32BufferAttribute(bc,3));bg.computeVertexNormals();
+ const bm=new THREE.Mesh(bg,new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true}));bm.receiveShadow=true;scene.add(bm);
+ const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.Float32BufferAttribute(rp,3));rg.computeVertexNormals();scene.add(new THREE.Mesh(rg,new THREE.MeshLambertMaterial({color:0x5f7a34,side:THREE.DoubleSide})));
+})();
 
 // ---- 20_entities.js
 // ---------- orcs ----------

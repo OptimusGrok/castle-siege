@@ -387,7 +387,7 @@ class PS{constructor(n,size,blend){this.n=n;this.pos=new Float32Array(n*3).fill(
   this.vel[j]*=k;this.vel[j+1]=this.vel[j+1]*k+buoy*dt;this.vel[j+2]*=k;this.pos[j]+=this.vel[j]*dt;this.pos[j+1]+=this.vel[j+1]*dt;this.pos[j+2]+=this.vel[j+2]*dt;const f=this.life[i]/this.max[i];
   const c=i*4;if(fire){this.col[c]=this.rgb[j];this.col[c+1]=this.rgb[j+1]*f;this.col[c+2]=this.rgb[j+2]*f*f;this.col[c+3]=this.a0[i]*Math.min(1,f*1.5);}else{this.col[c]=this.rgb[j];this.col[c+1]=this.rgb[j+1];this.col[c+2]=this.rgb[j+2];this.col[c+3]=this.a0[i]*Math.sin(f*Math.PI);}}
   this.pa.needsUpdate=true;this.ca.needsUpdate=true;}}
-const FIRE=new PS(900,0.9,THREE.AdditiveBlending),SMOKE=new PS(500,2.6,THREE.NormalBlending),SPARK=new PS(500,0.45,THREE.AdditiveBlending);
+const FIRE=new PS(900,0.9,THREE.AdditiveBlending),SMOKE=new PS(500,2.6,THREE.NormalBlending),SPARK=new PS(500,0.45,THREE.AdditiveBlending),GOREP=new PS(400,0.28,THREE.NormalBlending);
 const FIRES=[];
 SCORCH.forEach((s,i)=>{if(i>7)return;const x=s[0]+0.5,z=s[1];if(!clearSpot(x,z,2.4,2.2))return;const mt=LM(0x1e1610);for(let k=0;k<3;k++){const l=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,1.8),mt);l.position.set(x,0.2+k*0.1,z);l.rotation.y=k*1.1;scene.add(l);}FIRES.push({x,z,s:i%3===0?1.4:0.9});});
 const fireLights=[];FIRES.slice(0,2).forEach(f=>{const L=new THREE.PointLight(0xff7020,30,14,1.6);L.position.set(f.x,1.5,f.z);scene.add(L);fireLights.push(L);});
@@ -395,7 +395,7 @@ let envAcc=0;
 function envUpdate(dt,t){envAcc+=dt;const n=Math.floor(envAcc*60);envAcc-=n/60;
  for(let s=0;s<n;s++)for(const f of FIRES){if(rnd()<0.55*f.s)FIRE.emit(f.x+(rnd()-0.5)*0.8*f.s,0.3,f.z+(rnd()-0.5)*0.8*f.s,(rnd()-0.5)*0.4,1.6+rnd()*1.5,(rnd()-0.5)*0.4,0.5+rnd()*0.4,1,0.55+rnd()*0.2,0.2,0.9);
   if(rnd()<0.09*f.s)SMOKE.emit(f.x,1.6,f.z,0.5+rnd()*0.3,1+rnd()*0.6,(rnd()-0.5)*0.3,4+rnd()*2,0.16,0.14,0.13,0.45);}
- FIRE.update(dt,1.2,1.5,true);SMOKE.update(dt,0.15,0.3,false);SPARK.update(dt,-6,1,true);
+ FIRE.update(dt,1.2,1.5,true);SMOKE.update(dt,0.15,0.3,false);SPARK.update(dt,-6,1,true);GOREP.update(dt,-16,0.6,false);
  fireLights.forEach((L,i)=>L.intensity=24+Math.sin(t*13+i*3)*5+Math.sin(t*29+i)*4);
  for(const b of BANNERS){const p=b.geo.attributes.position,a=p.array;for(let i=0;i<p.count;i++){const x=b.base[i*3],y=b.base[i*3+1];a[i*3+2]=Math.sin(t*3.2+b.ph+x*2.6+y*0.7)*0.18*x;}p.needsUpdate=true;}}
 
@@ -595,7 +595,23 @@ function spawnEnemy(type,mul,s0,el){const T=ET[type];const e=POOL[type].pop()||O
  e.el=el||1;e.root.scale.setScalar(el>1?1.25:el<1?0.7:1);e.root.visible=true;e.root.rotation.set(0,0,0);e.g.position.y=0;e.bar.visible=!!T.boss||el>1;scene.add(e.root);scene.add(e.bar);G.enemies.push(e);placeEnemy(e,0);return e;}
 function placeEnemy(e,dt){const p=pathAt(e.s);const x=p.x-p.dz*e.off,z=p.z+p.dx*e.off;e.root.position.set(x,0,z);const ty=Math.atan2(p.dx,p.dz);let d=ty-e.yaw;d=Math.atan2(Math.sin(d),Math.cos(d));e.yaw+=d*Math.min(1,dt*8);e.root.rotation.y=e.yaw;}
 function damage(e,amt,kind){if(e.dead)return;let a=e.T.arm;if(kind==='magic')a=0;else if(kind==='pierce')a*=0.4;e.hp-=amt*(1-a);e.hitT=0.12;e.bar.visible=true;if(e.hp<=0)kill(e);}
-function kill(e){e.dead=true;e.dying=0.001;G.gold+=Math.round(e.T.gold*(e.el>1?3:e.el<1?0.5:1));G.stats.kills++;AU.play('die',e.T.boss);AU.play('coin');const p=e.root.position;for(let i=0;i<(e.T.boss?40:8);i++)SPARK.emit(p.x,1+rnd()*e.T.sc,p.z,(rnd()-0.5)*4,2+rnd()*4,(rnd()-0.5)*4,0.8,1,0.85,0.2,1);
+// ---------- green blood decals (instanced, capped, fade over 3s) ----------
+const BLOOD=(function(){const N=120,LIFE=3;const cv=document.createElement('canvas');cv.width=cv.height=128;const x=cv.getContext('2d');let sd=99;const R=()=>(sd=(sd*16807)%2147483647,(sd-1)/2147483646);
+ const blob=(cx,cy,r,a)=>{x.globalAlpha=a;x.beginPath();for(let k=0;k<=14;k++){const t=k/14*Math.PI*2,rr=r*(0.75+R()*0.45);x.lineTo(cx+Math.cos(t)*rr,cy+Math.sin(t)*rr);}x.fill();};
+ x.fillStyle='#fff';blob(64,64,26,1);for(let k=0;k<5;k++)blob(64+(R()-0.5)*30,64+(R()-0.5)*30,12+R()*8,1);
+ for(let k=0;k<22;k++){const a=R()*6.28,d=30+R()*30;blob(64+Math.cos(a)*d,64+Math.sin(a)*d,1.5+R()*4,1);}
+ const tex=new THREE.CanvasTexture(cv);const geo=new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2);const aA=new THREE.InstancedBufferAttribute(new Float32Array(N),1);geo.setAttribute('aA',aA);
+ const mat=new THREE.MeshLambertMaterial({map:tex,color:0x56c826,emissive:0x1c4a0c,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
+ mat.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aA;varying float vA;').replace('#include <begin_vertex>','#include <begin_vertex>\nvA=aA;');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vA;').replace('#include <map_fragment>','#include <map_fragment>\ndiffuseColor.a*=vA;');};
+ const im=new THREE.InstancedMesh(geo,mat,N);im.count=0;im.frustumCulled=false;im.renderOrder=1;scene.add(im);
+ const D=[];const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),sc=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);let slot=0;
+ function add(px,pz,size){const d={x:px,z:pz,s:size,r:R()*6.28,t:0,i:slot};slot=(slot+1)%N;const old=D.findIndex(o=>o.i===d.i);if(old>=0)D.splice(old,1);D.push(d);}
+ function update(dt){let n=0;for(let k=D.length-1;k>=0;k--){const d=D[k];d.t+=dt;if(d.t>=LIFE){D.splice(k,1);continue;}}
+  D.forEach((d,j)=>{const g=Math.min(1,d.t/0.18);const a=d.t<0.18?1:Math.pow(1-(d.t-0.18)/(LIFE-0.18),1.2);q.setFromAxisAngle(up,d.r);v.set(d.x,0.16,d.z);const s=d.s*(0.55+0.45*g);sc.set(s,1,s);m4.compose(v,q,sc);im.setMatrixAt(j,m4);aA.array[j]=a*0.92;});
+  im.count=D.length;im.instanceMatrix.needsUpdate=true;aA.needsUpdate=true;}
+ return {add,update,D};})();
+function kill(e){e.dead=true;e.dying=0.001;G.gold+=Math.round(e.T.gold*(e.el>1?3:e.el<1?0.5:1));G.stats.kills++;AU.play('die',e.T.boss);AU.play('coin');const p=e.root.position;{const sz=e.T.sc||1;BLOOD.add(p.x+(rnd()-0.5)*0.3,p.z+(rnd()-0.5)*0.3,2.2*sz*(e.T.boss?1.4:1));const nd=Math.round((e.T.boss?40:14)*Math.min(2,sz));for(let i=0;i<nd;i++)GOREP.emit(p.x,0.6+rnd()*0.8*sz,p.z,(rnd()-0.5)*4*sz,2+rnd()*3,(rnd()-0.5)*4*sz,0.5+rnd()*0.3,0.25,0.75,0.12,0.95);}for(let i=0;i<(e.T.boss?40:8);i++)SPARK.emit(p.x,1+rnd()*e.T.sc,p.z,(rnd()-0.5)*4,2+rnd()*4,(rnd()-0.5)*4,0.8,1,0.85,0.2,1);
  if(e.T.boss){for(let i=0;i<30;i++)SMOKE.emit(p.x+(rnd()-0.5)*3,0.5,p.z+(rnd()-0.5)*3,(rnd()-0.5),0.8,(rnd()-0.5),2.5,0.3,0.26,0.22,0.6);floater('Warlord slain! +'+e.T.gold);}}
 function updateEnemies(dt){const cq=camera.quaternion;for(let i=G.enemies.length-1;i>=0;i--){const e=G.enemies[i];
   if(e.dying){e.dying+=dt;e.root.rotation.x=-Math.min(1.5,e.dying*4);e.g.position.y=-Math.max(0,e.dying-0.6)*1.5;e.bar.visible=false;if(e.dying>1.2){e.root.visible=false;scene.remove(e.root);scene.remove(e.bar);POOL[e.type].push(e);G.enemies.splice(i,1);}continue;}
@@ -734,8 +750,8 @@ function updateWaves(dt){for(let i=G.queues.length-1;i>=0;i--){const q=G.queues[
  if(G.state==='play'&&G.waveOpen&&G.queues.length===0&&G.enemies.length===0){const ws=Object.keys(G.waveOpen);if(ws.length){G.waveOpen={};const b=30+G.wave*6;G.gold+=b;floater('Wave cleared +'+b);AU.setIntensity(0);saveBest(G.wave);
    if(!G.endless&&G.wave>=WIN_WAVE){gameOver(true);return;}ui();}}}
 function saveBest(w){if(w>G.best){G.best=w;try{localStorage.setItem('orcattack.best',w);}catch(e){}}}
-function step(dt){G.time+=dt;updateWaves(dt);updateEnemies(dt);updateTowers(dt);updateProjectiles(dt);}
-function resetGame(endless){for(const e of G.enemies){scene.remove(e.root);scene.remove(e.bar);POOL[e.type].push(e);}for(const t of [...G.towers])sellTower(t);for(let i=PJ.length-1;i>=0;i--)retire(PJ[i],i);
+function step(dt){G.time+=dt;updateWaves(dt);updateEnemies(dt);updateTowers(dt);updateProjectiles(dt);BLOOD.update(dt);}
+function resetGame(endless){BLOOD.D.length=0;BLOOD.update(0);for(const e of G.enemies){scene.remove(e.root);scene.remove(e.bar);POOL[e.type].push(e);}for(const t of [...G.towers])sellTower(t);for(let i=PJ.length-1;i>=0;i--)retire(PJ[i],i);
  Object.assign(G,{state:'play',endless:!!endless,gold:60,lives:20,wave:0,enemies:[],towers:[],queues:[],waveOpen:{},speed:1,paused:false,time:0,stats:{kills:0,built:0,shots:{}},sel:null});closeSheet();ui();}
 function gameOver(win){if(G.state!=='play')return;G.state=win?'won':'lost';AU.setIntensity(0);AU.play(win?'win':'lose');saveBest(win?G.wave:G.wave-1);
  $('overT').textContent=win?'Victory! The Orc Attack Is Broken':'The Orcs Have Taken the Keep';$('overP').textContent=(win?'All '+WIN_WAVE+' waves repelled. ':'You held until wave '+G.wave+'. ')+G.stats.kills+' orcs slain. Best wave: '+G.best+'.';

@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#1a1410;font-family:Ge
 #bPortal span{position:absolute;left:0;right:0;bottom:-15px;font:bold 11px sans-serif;color:#e8d0ff;text-shadow:0 1px 2px #000}
 #bPortal.ready i,#bPortal.placing i,#bPortal.active i{filter:none}#bPortal.ready{animation:ppulse 1s ease-in-out infinite}#bPortal.placing{box-shadow:0 0 0 3px #fff,0 0 18px #c070ff}
 @keyframes pspin{to{transform:rotate(360deg)}}@keyframes ppulse{50%{box-shadow:0 0 22px 6px #c070ff}}
-body.menu #bPortal{display:none}
+body.menu #bPortal{display:none}#bPortal.idle span{opacity:.45}#bPortal.idle span::after{content:' ⏸'}
 #bWave{position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));font-size:17px;padding:12px 16px;z-index:5}
 #bWave.early{background:linear-gradient(#3a5a22,#22380f);border-color:#8ac050}
 #sheet{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(560px,100%);background:rgba(28,18,10,.95);border:2px solid #8a6430;border-bottom:none;border-radius:16px 16px 0 0;padding:10px 12px calc(12px + env(safe-area-inset-bottom));z-index:6;transition:transform .18s}
@@ -757,13 +757,14 @@ const PORTAL=(function(){const CHARGE=60,LAST=15;const P={charge:0,ready:false,p
  P.cancel=()=>{if(P.placing){P.placing=false;ghost.visible=false;P.ui();}};
  P.hover=(x,z)=>{if(!P.placing)return;const r=pathS(x,z);ghost.visible=true;const v=valid(x,z);if(v)orient(ghost,v.s);else{ghost.position.set(x,0,z);}ghost.userData.ring.material.color.setHex(v?0xb060ff:0xff4040);};
  P.place=(x,z)=>{if(!P.placing)return false;const v=valid(x,z);if(!v){AU.play('click');return false;}P.placing=false;ghost.visible=false;P.ready=false;P.charge=0;P.active={s:v.s,t:LAST};orient(mesh,v.s);mesh.visible=true;AU.play('portal');flash(mesh.position.x,mesh.position.z);P.ui();return true;};
- P.update=(dt)=>{if(!P.active&&!P.ready){P.charge=Math.min(CHARGE,P.charge+dt);if(P.charge>=CHARGE){P.ready=true;AU.play('portalReady');}}
+ P.inWave=()=>G.queues.length>0||G.enemies.some(e=>!e.dead);
+ P.update=(dt)=>{P.waveOn=P.inWave();if(!P.active&&!P.ready&&P.waveOn){P.charge=Math.min(CHARGE,P.charge+dt);if(P.charge>=CHARGE){P.ready=true;AU.play('portalReady');}}
   if(P.active){const A=P.active;A.t-=dt;for(const e of G.enemies){if(e.dead){e._pl=undefined;continue;}if(e._pl!==undefined&&e._pl<A.s&&e.s>=A.s){flash(mesh.position.x,mesh.position.z);e.s=0.5;const p0=pathAt(0.5);e.root.position.x=p0.x;e.root.position.z=p0.z;flash(p0.x+2,p0.z);P.teleports++;AU.play('portal');}e._pl=e.s;}
    if(A.t<=0){P.active=null;mesh.visible=false;for(const e of G.enemies)e._pl=undefined;}}
   P.ui();};
  P.anim=(rt)=>{for(const g of [mesh,ghost]){if(!g.visible)continue;const u=g.userData;u.disc.rotation.z=-rt*3;u.gl.rotation.y=rt*2;const fade=g===mesh&&P.active?Math.min(1,P.active.t/2.5):0.45;const pul=1+Math.sin(rt*6)*0.05;u.disc.scale.setScalar(pul*(g===mesh?0.6+0.4*Math.min(1,(LAST-P.active.t)/0.4):1));u.disc.material.opacity=fade;u.ring.material.opacity=fade;u.gl.material.opacity=fade*0.7;}};
- let lastTxt='';P.ui=()=>{const b=document.getElementById('bPortal');if(!b)return;const pct=P.active?P.active.t/LAST:P.charge/CHARGE;b.style.setProperty('--p',(pct*360).toFixed(1)+'deg');b.classList.toggle('ready',P.ready&&!P.placing);b.classList.toggle('placing',P.placing);b.classList.toggle('active',!!P.active);
-  const t=P.active?Math.ceil(P.active.t)+'s':P.ready?(P.placing?'✕':''):Math.ceil(CHARGE-P.charge)+'s';if(t!==lastTxt){b.querySelector('span').textContent=t;lastTxt=t;}b.title=P.placing?'Tap the path to place the portal (Esc to cancel)':P.ready?'Portal ready: tap, then tap the path':P.active?'Portal open':'Portal charging';};
+ let lastTxt='';P.ui=()=>{const b=document.getElementById('bPortal');if(!b)return;const pct=P.active?P.active.t/LAST:P.charge/CHARGE;b.style.setProperty('--p',(pct*360).toFixed(1)+'deg');b.classList.toggle('ready',P.ready&&!P.placing);b.classList.toggle('placing',P.placing);b.classList.toggle('active',!!P.active);b.classList.toggle('idle',!P.active&&!P.ready&&!P.waveOn);
+  const t=P.active?Math.ceil(P.active.t)+'s':P.ready?(P.placing?'✕':''):Math.ceil(CHARGE-P.charge)+'s';if(t!==lastTxt){b.querySelector('span').textContent=t;lastTxt=t;}b.title=P.placing?'Tap the path to place the portal (Esc to cancel)':P.ready?'Portal ready: tap, then tap the path':P.active?'Portal open':P.waveOn?'Portal charging':'Portal charges during waves';};
  P.pathS=pathS;P.valid=valid;P.mesh=mesh;
  return P;})();
 

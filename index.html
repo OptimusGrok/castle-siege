@@ -202,12 +202,12 @@ function pathAt(s){let g=SEG[SEG.length-1];for(const q of SEG){if(s<=q.s0+q.len)
 function distPath(x,z){let m=1e9;for(const q of SEG){let u=(x-q.ax)*q.dx+(z-q.az)*q.dz;u=Math.max(0,Math.min(q.len,u));m=Math.min(m,Math.hypot(x-(q.ax+q.dx*u),z-(q.az+q.dz*u)));}return m;}
 const KEEP={x:25.5,z:0};
 // ---------- pads ----------
-const PADS=[];const RAISED=[[-24,-15.2],[-18.6,2.6],[-6.6,-13.6],[4,13.9]].filter(c=>distPath(c[0],c[1])>=3.4);const WALLH=2.8;
- RAISED.forEach(c=>PADS.push({x:c[0],z:c[1],y:WALLH,raised:true,tower:null,i:PADS.length}));
-[[-27,-7.5],[-10.5,-3],[-3,9],[0,-4.5],[4.5,3],[15,-3],[19.5,7.5],[-12,-13.5]].forEach(c=>PADS.push({x:c[0],z:c[1],y:0,tower:null,i:PADS.length}));
+const PADS=[];const RAISED=[[-24,-15.2],[-18.6,2.6],[-6.6,-13.6],[4,13.9],[-10.1,-3],[0,-4.1],[4.1,3],[14.77,-3.7]].filter(c=>distPath(c[0],c[1])>=3.4);const WALLH=2.8;
+ RAISED.forEach((c,i)=>PADS.push({x:c[0],z:c[1],y:WALLH,raised:true,join:i>=4,tower:null,i:PADS.length}));
+// (ground pads removed: every build spot is now a raised wall platform)
 function nearestPath(x,z){let m=1e9,bx=0,bz=0;for(const q of SEG){let u=(x-q.ax)*q.dx+(z-q.az)*q.dz;u=Math.max(0,Math.min(q.len,u));const px=q.ax+q.dx*u,pz=q.az+q.dz*u,d=Math.hypot(x-px,z-pz);if(d<m){m=d;bx=px;bz=pz;}}return {x:bx,z:bz,d:m};}
 // push ground pads back so a low outer wall fits between them and the path
-const PADWALL=[];PADS.forEach(p=>{if(p.y)return;for(let it=0;it<6;it++){const n=nearestPath(p.x,p.z);if(n.d>=3.85)break;const dx=(p.x-n.x)/n.d,dz=(p.z-n.z)/n.d;p.x=n.x+dx*3.9;p.z=n.z+dz*3.9;}
+const PADWALL=[];PADS.forEach(p=>{if(p.y&&!p.join)return;for(let it=0;it<6;it++){const n=nearestPath(p.x,p.z);if(n.d>=3.85)break;const dx=(p.x-n.x)/n.d,dz=(p.z-n.z)/n.d;p.x=n.x+dx*3.9;p.z=n.z+dz*3.9;}
  const n=nearestPath(p.x,p.z);PADWALL.push({cx:n.x+(p.x-n.x)/n.d*2.05,cz:n.z+(p.z-n.z)/n.d*2.05,tx:-(p.z-n.z)/n.d,tz:(p.x-n.x)/n.d});});
 function nearPad(x,z,r){return PADS.some(p=>Math.hypot(p.x-x,p.z-z)<r);}
 function clearSpot(x,z,rp,rpad){return distPath(x,z)>rp&&!nearPad(x,z,rpad)&&Math.hypot(x-KEEP.x,z-KEEP.z)>7;}
@@ -248,10 +248,10 @@ function bastion(x,z){const H=WALLH,S=4.2;let bx=0,bz=0,bd=1e9;for(let a=0;a<16;
  for(const sd of [-1,1])addBlock(x+bx*(S/2+sl*n/2)+(bz?sd*0.8:0),H*0.25,z+bz*(S/2+sl*n/2)+(bx?sd*0.8:0),bx?sl*n:0.3,H*0.5,bz?sl*n:0.3,0,0.65);}
 RAISED.forEach(r=>bastion(r[0],r[1]));
 // low outer curtain walls between path and ground pads (merged with the other blocks)
-function curtain(cx,cz,tx,tz,len,gap){const ry=Math.atan2(tx,tz),n=Math.round(len/0.9),H=1.25;for(let i=0;i<n;i++){const o=(i-(n-1)/2)*(len/n),x=cx+tx*o,z=cz+tz*o;if(distPath(x,z)<1.75||nearPad(x,z,1.9)||(gap!==undefined&&Math.abs(i-gap)<1))continue;
+function curtain(cx,cz,tx,tz,len,gap){const ry=Math.atan2(tx,tz),n=Math.round(len/0.9),H=1.25;for(let i=0;i<n;i++){const o=(i-(n-1)/2)*(len/n),x=cx+tx*o,z=cz+tz*o;if(distPath(x,z)<1.75||nearPad(x,z,1.9)||RAISED.some(r=>Math.max(Math.abs(r[0]-x),Math.abs(r[1]-z))<2.3)||(gap!==undefined&&Math.abs(i-gap)<1))continue;
   const h=H*(0.8+rnd()*0.3)*(gap!==undefined&&Math.abs(i-gap)<2?0.55:1);addBlock(x,h/4,z,0.75,h/2,len/n+0.02,ry,0.78+rnd()*0.2);addBlock(x,h*0.75,z,0.68,h/2,len/n,ry,0.85+rnd()*0.2);
   if(i%2===0&&h>1)addBlock(x,h+0.2,z,0.6,0.4,len/n*0.8,ry,0.9);}}
-PADWALL.forEach((w,i)=>curtain(w.cx,w.cz,w.tx,w.tz,4.6,i%3===1?1:undefined));
+PADWALL.forEach((w,i)=>curtain(w.cx,w.cz,w.tx,w.tz,9,undefined));
 // a few extra runs along the path for the ruined-curtain look
 [[-34,-13.1,1,0,6,3],[-20,-8.9,1,0,5],[-11.9,-3,0,1,5,2],[-1.9,0,0,1,6],[11,7.9,1,0,4,1],[18,2.1,1,0,3],[-9,8.1,1,0,5,4]].forEach(r=>curtain(r[0],r[1],r[2],r[3],r[4],r[5]));
 const stoneMat=new THREE.MeshLambertMaterial({color:0xe6dfd2});stoneMat.userData.texMat=STONEV;

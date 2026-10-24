@@ -530,7 +530,7 @@ const $=id=>document.getElementById(id);
 const WIN_WAVE=20;
 const G={state:'title',mode:'normal',gold:0,lives:0,wave:0,enemies:[],towers:[],queues:[],speed:1,paused:false,time:0,fps:60,stats:{kills:0,built:0,shots:{}},sel:null,best:0};
 try{const o=localStorage.getItem('cs.best');if(o!==null&&localStorage.getItem('orcattack.best')===null)localStorage.setItem('orcattack.best',o);G.best=+localStorage.getItem('orcattack.best')||0;}catch(e){}
-function hpMul(w){return 1+0.15*(w-1)+0.016*(w-1)*(w-1);}
+function hpMul(w){return 1.10*(1+0.15*(w-1)+0.016*(w-1)*(w-1));}
 function waveDef(w){const g=[];const f=Math.floor,c=Math.min(2,1.1+0.04*w),E=3.2;
  if(w%10===0){g.push({t:'grunt',n:f((6+w)*c),gap:0.5,d:0});g.push({t:'goblin',n:f((8+w)*c),gap:0.3,d:4});g.push({t:'brute',n:f(w/2)+2,gap:1.5,d:6});g.push({t:'brute',n:2+f(w/10),gap:3,d:14,m:E});g.push({t:'warlord',n:w>=20?2:1,gap:9,d:12});if(w>20)g.push({t:'warlord',n:f(w/20),gap:6,d:24});}
  else if(w%5===0){g.push({t:'brute',n:f((3+w/2)*c),gap:1.2,d:0});g.push({t:'goblin',n:f((10+w)*c),gap:0.28,d:3});g.push({t:'grunt',n:w,gap:0.6,d:9});g.push({t:'brute',n:1+f(w/5),gap:3,d:12,m:E});}

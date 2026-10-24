@@ -221,13 +221,14 @@ function pathAt(s){let g=SEG[SEG.length-1];for(const q of SEG){if(s<=q.s0+q.len)
 function distPath(x,z){let m=1e9;for(const q of SEG){let u=(x-q.ax)*q.dx+(z-q.az)*q.dz;u=Math.max(0,Math.min(q.len,u));m=Math.min(m,Math.hypot(x-(q.ax+q.dx*u),z-(q.az+q.dz*u)));}return m;}
 const KEEP={x:25.5,z:0};
 // ---------- pads ----------
-const PADS=[];const RAISED=[[-24,-15.2],[-18.6,2.6],[-6.6,-13.6],[4,13.9],[-10.1,-3],[0,-4.1],[4.1,3],[14.77,-3.7]].filter(c=>distPath(c[0],c[1])>=3.4);const WALLH=2.8;
+const PADS=[];const RAISED=[[-24,-15.2],[-18.6,2.6],[-6.6,-13.6],[4,13.9],[-10.1,-3],[0,-4.1],[4.1,3],[14.77,-3.7]].filter(c=>distPath(c[0],c[1])>=3.4);const WALLH=2.8;const CORNERS=[[-30,-19],[30,-19],[-30,19],[30,19]],CORNH=4.4;
  RAISED.forEach((c,i)=>PADS.push({x:c[0],z:c[1],y:WALLH,raised:true,join:i>=4,tower:null,i:PADS.length}));
 // (ground pads removed: every build spot is now a raised wall platform)
 function nearestPath(x,z){let m=1e9,bx=0,bz=0;for(const q of SEG){let u=(x-q.ax)*q.dx+(z-q.az)*q.dz;u=Math.max(0,Math.min(q.len,u));const px=q.ax+q.dx*u,pz=q.az+q.dz*u,d=Math.hypot(x-px,z-pz);if(d<m){m=d;bx=px;bz=pz;}}return {x:bx,z:bz,d:m};}
 // push ground pads back so a low outer wall fits between them and the path
 const PADWALL=[];PADS.forEach(p=>{if(p.y&&!p.join)return;for(let it=0;it<6;it++){const n=nearestPath(p.x,p.z);if(n.d>=3.85)break;const dx=(p.x-n.x)/n.d,dz=(p.z-n.z)/n.d;p.x=n.x+dx*3.9;p.z=n.z+dz*3.9;}
  const n=nearestPath(p.x,p.z);PADWALL.push({cx:n.x+(p.x-n.x)/n.d*2.05,cz:n.z+(p.z-n.z)/n.d*2.05,tx:-(p.z-n.z)/n.d,tz:(p.x-n.x)/n.d});});
+CORNERS.forEach(c=>PADS.push({x:c[0],z:c[1],y:CORNH,raised:true,corner:true,tower:null,i:PADS.length}));
 function nearPad(x,z,r){return PADS.some(p=>Math.hypot(p.x-x,p.z-z)<r);}
 function clearSpot(x,z,rp,rpad){return distPath(x,z)>rp&&!nearPad(x,z,rpad)&&Math.hypot(x-KEEP.x,z-KEEP.z)>7;}
 const SCORCH=[[-20,-3,5],[2,-14,4],[12,3,4.5],[-9,14,5],[-25,13,4],[21,-12,4],[0,1,3.5],[-22,-16,3],[4,15,4],[-12,-1,3]];
@@ -249,7 +250,7 @@ const SCORCH=[[-20,-3,5],[2,-14,4],[12,3,4.5],[-9,14,5],[-25,13,4],[21,-12,4],[0
 const blocks=[],rubbleL=[];
 function addBlock(x,y,z,sx,sy,sz,ry,shade){blocks.push([x,y,z,sx,sy,sz,ry,shade]);}
 function wall(x1,z1,x2,z2,breaches,baseH,thick){const L=Math.hypot(x2-x1,z2-z1),n=Math.ceil(L/1.7),ry=Math.atan2(x2-x1,z2-z1);thick=thick||1.6;
- for(let i=0;i<n;i++){const t=(i+0.5)/n,x=x1+(x2-x1)*t,z=z1+(z2-z1)*t;if(distPath(x,z)<2.4||nearPad(x,z,2.2)||RAISED.some(r=>Math.hypot(r[0]-x,r[1]-z)<2.6))continue;let h=(baseH||5)+(fbm(x*0.25+3,z*0.25)-0.5)*3.5;
+ for(let i=0;i<n;i++){const t=(i+0.5)/n,x=x1+(x2-x1)*t,z=z1+(z2-z1)*t;if(distPath(x,z)<2.4||CORNERS.some(c=>Math.hypot(c[0]-x,c[1]-z)<3.7)||nearPad(x,z,2.2)||RAISED.some(r=>Math.hypot(r[0]-x,r[1]-z)<2.6))continue;let h=(baseH||5)+(fbm(x*0.25+3,z*0.25)-0.5)*3.5;
   for(const b of breaches||[]){const d=Math.hypot(x-b[0],z-b[1]);if(d<b[2])h=Math.min(h,d<b[2]*0.55?0:h*(d-b[2]*0.55)/(b[2]*0.45));}
   if(h<0.6){for(let k=0;k<3;k++)rubbleL.push([x+(rnd()-0.5)*3,z+(rnd()-0.5)*3,0.5+rnd()*0.8]);continue;}
   const courses=Math.max(1,Math.round(h/1.1));for(let k=0;k<courses;k++){const top=k===courses-1;const jl=top?(rnd()-0.5)*0.5:0;addBlock(x+(rnd()-0.5)*0.08,k*1.1+0.55,z,thick,1.08,top?1.0+rnd()*0.6:1.68,ry+jl*0.2,0.75+rnd()*0.3);}
@@ -294,7 +295,11 @@ function ruinTower(x,z,h,r){const g=new THREE.Group();const m=new THREE.Mesh(new
  const inner=new THREE.Mesh(new THREE.CylinderGeometry(r*0.8,r*0.8,0.2,14),LM(0x2a2420));inner.position.y=h+0.01;g.add(inner);
  for(let k=0;k<10;k++){const a=k/10*Math.PI*2;if(rnd()<0.4)continue;const th=0.6+rnd()*2.2;const b=new THREE.Mesh(new THREE.BoxGeometry(0.9,th,0.7),stoneMat);b.position.set(Math.cos(a)*r*0.9,h+th/2,Math.sin(a)*r*0.9);b.rotation.y=-a;b.castShadow=true;g.add(b);}
  mergeGroup(g);g.position.set(x,0,z);scene.add(g);for(let k=0;k<14;k++)rubbleL.push([x+(rnd()-0.5)*r*4,z+(rnd()-0.5)*r*4,0.5+rnd()*1.1]);}
-ruinTower(-30,-19,8,3.2);ruinTower(30,-19,5,3.2);ruinTower(-30,19,3,3.2);ruinTower(30,19,9,3.2);ruinTower(-21,9.5,2.2,2.2);ruinTower(13,-13,1.4,2);
+function cornerTower(x,z){const g=new THREE.Group(),H=CORNH,r=3.2;const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r*1.12,H,16,1),stoneMat);m.position.y=H/2;g.add(m);
+ const lip=new THREE.Mesh(new THREE.CylinderGeometry(r+0.25,r+0.05,0.35,16,1),stoneMat);lip.position.y=H-0.15;g.add(lip);
+ for(let k=0;k<16;k++){const a=k/16*Math.PI*2,tall=k%2===0;const b=new THREE.Mesh(new THREE.BoxGeometry(0.8,tall?0.8:0.35,0.55),stoneMat);b.position.set(Math.cos(a)*(r+0.05),H+(tall?0.4:0.17),Math.sin(a)*(r+0.05));b.rotation.y=-a+Math.PI/2;b.userData.shade=0.85+rnd()*0.2;g.add(b);}
+ g.traverse(o=>{if(o.isMesh)o.castShadow=o.receiveShadow=true;});mergeGroup(g);g.position.set(x,0,z);scene.add(g);for(let k=0;k<8;k++)rubbleL.push([x+(rnd()-0.5)*r*4,z+(rnd()-0.5)*r*4,0.4+rnd()*0.8]);}
+CORNERS.forEach(c=>cornerTower(c[0],c[1]));ruinTower(-21,9.5,2.2,2.2);ruinTower(13,-13,1.4,2);
 // fallen tower lying on its side
 (function(){const m=new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.3,8,12,1,true),stoneMat);m.rotation.z=Math.PI/2;m.rotation.y=0.5;m.position.set(-5,1.0,16.3);const fm=mergeList([m],STONEV,1/TEXW);fm.castShadow=true;scene.add(fm);for(let k=0;k<12;k++)rubbleL.push([-5+(rnd()-0.5)*9,15.5+(rnd()-0.5)*4,0.4+rnd()]);})();
 for(let i=0;i<260;i++){const x=(rnd()-0.5)*58,z=(rnd()-0.5)*36;if(fbm(x*0.2,z*0.2)>0.45)rubbleL.push([x,z,0.2+rnd()*0.55]);}
@@ -465,16 +470,16 @@ function buildTowerMesh(t){const g=t.g;while(g.children.length)g.remove(g.childr
   t.muzzleY=H+1;}
  g.add(t.turret);mergeGroup(g);const sc=1.12+L*0.07;g.scale.setScalar(sc);renderer.shadowMap.needsUpdate=true;}
 const slowGeo=new THREE.RingGeometry(0.2,1,40).rotateX(-Math.PI/2);
-function buildTower(pad,type){const T=TT[type];if(pad.tower||G.gold<T.cost)return null;G.gold-=T.cost;const t={type,T,pad,lvl:0,cd:0.3,spent:T.cost,g:new THREE.Group(),aim:0,anim:0,x:pad.x,z:pad.z};
+function buildTower(pad,type){const T=TT[type];if(pad.corner&&type!=='wizard')return null;if(pad.tower||G.gold<T.cost)return null;G.gold-=T.cost;const t={type,T,pad,lvl:0,cd:0.3,spent:T.cost,g:new THREE.Group(),aim:0,anim:0,x:pad.x,z:pad.z};
  t.g.position.set(pad.x,pad.y+0.3,pad.z);scene.add(t.g);buildTowerMesh(t);pad.tower=t;pad.ring.visible=false;G.towers.push(t);
- if(type==='wizard'){t.field=new THREE.Mesh(slowGeo,new THREE.MeshBasicMaterial({color:0x8a60ff,transparent:true,opacity:0.12,depthWrite:false,blending:THREE.AdditiveBlending}));t.field.position.set(pad.x,0.14,pad.z);t.field.renderOrder=2;scene.add(t.field);}
+ if(type==='wizard'){t.field=new THREE.Mesh(slowGeo,new THREE.MeshBasicMaterial({color:0x8a60ff,transparent:true,opacity:0.12,depthWrite:false,blending:THREE.AdditiveBlending}));{const n=pad.corner?nearestPath(pad.x,pad.z):pad;t.fx=n.x;t.fz=n.z;}t.field.position.set(t.fx,0.14,t.fz);t.field.renderOrder=2;scene.add(t.field);}
  AU.play('build');for(let i=0;i<14;i++)SMOKE.emit(pad.x+(rnd()-0.5)*2,pad.y+0.4,pad.z+(rnd()-0.5)*2,(rnd()-0.5)*2,0.6,(rnd()-0.5)*2,1.2,0.5,0.45,0.38,0.5);G.stats.built++;return t;}
 function upgradeTower(t){if(t.lvl>=2)return false;const c=t.T.up[t.lvl+1];if(G.gold<c)return false;G.gold-=c;t.spent+=c;t.lvl++;buildTowerMesh(t);AU.play('build');for(let i=0;i<20;i++)SPARK.emit(t.x+(rnd()-0.5)*1.5,0.5+rnd()*3,t.z+(rnd()-0.5)*1.5,0,2,0,0.8,1,0.85,0.3,1);return true;}
 function sellTower(t){const v=Math.floor(t.spent*0.7);G.gold+=v;scene.remove(t.g);if(t.field)scene.remove(t.field);t.pad.tower=null;t.pad.ring.visible=true;G.towers.splice(G.towers.indexOf(t),1);AU.play('sell');renderer.shadowMap.needsUpdate=true;return v;}
-const HB=1.15;const _sc={};function stat(t){const b=t.T.lv[t.lvl];if(!t.pad.y)return b;const k=t.type+t.lvl;return _sc[k]||(_sc[k]=Object.assign({},b,{range:Math.round(b.range*HB*10)/10}));}
+const HB=1.15;const _sc={};function stat(t){const b=t.T.lv[t.lvl];if(!t.pad.y)return b;const k=t.type+t.lvl+(t.pad.corner?'c'+t.pad.i:'');if(_sc[k])return _sc[k];let r=b.range*HB;if(t.pad.corner)r=Math.max(r,distPath(t.pad.x,t.pad.z)+3+t.lvl);return _sc[k]=Object.assign({},b,{range:Math.round(r*10)/10,sr:b.range*0.6});}
 function findTarget(x,z,r,excl){let best=null,bs=-1;const r2=r*r;for(const e of G.enemies){if(e.dead||(excl&&excl.has(e)))continue;const p=e.root.position,dx=p.x-x,dz=p.z-z;if(dx*dx+dz*dz<=r2&&e.s>bs){bs=e.s;best=e;}}return best;}
 function updateTowers(dt){for(const t of G.towers){const S=stat(t);t.cd-=dt;t.anim=Math.max(0,t.anim-dt);
-  if(t.type==='wizard'){const sr=S.range*0.6;t.field.scale.setScalar(sr);t.field.material.opacity=0.1+Math.sin(G.time*3)*0.04;const r2=sr*sr;for(const e of G.enemies){if(e.dead)continue;const p=e.root.position;if((p.x-t.x)**2+(p.z-t.z)**2<r2){e.slowF=Math.min(e.slowF,1-S.slow);e.slowT=0.2;}}
+  if(t.type==='wizard'){if(t.pad.corner){const tg=findTarget(t.x,t.z,S.range);if(tg){t.fx+=(tg.root.position.x-t.fx)*Math.min(1,dt*2);t.fz+=(tg.root.position.z-t.fz)*Math.min(1,dt*2);t.field.position.set(t.fx,0.14,t.fz);}}const sr=S.sr||S.range*0.6;t.field.scale.setScalar(sr);t.field.material.opacity=0.1+Math.sin(G.time*3)*0.04;const r2=sr*sr;for(const e of G.enemies){if(e.dead)continue;const p=e.root.position;if((p.x-t.fx)**2+(p.z-t.fz)**2<r2){e.slowF=Math.min(e.slowF,1-S.slow);e.slowT=0.2;}}
    t.crystal.rotation.y+=dt*2;t.crystal.position.y=t.muzzleY+Math.sin(G.time*2+t.x)*0.15;if(t.orbit)t.orbit.rotation.y-=dt*1.5;}
   if(t.arm){const a=t.anim>0?(t.anim>1.9?0.9-((2.2-t.anim)/0.3)*1.6:-0.7+(1.9-t.anim)/1.9*1.6):0.9;t.arm.rotation.x=Math.max(-0.7,Math.min(0.9,a));t.rock.visible=t.anim<1.0;}
   for(const b of t.barrels)b.position.z=-Math.max(0,t.anim-0.15)*0.8;
@@ -484,7 +489,7 @@ function updateTowers(dt){for(const t of G.towers){const S=stat(t);t.cd-=dt;t.an
 const PJ=[];const PJPOOL={arrow:[],rock:[],ball:[]};
 const pjGeo={arrow:new THREE.BoxGeometry(0.09,0.09,1.1),rock:new THREE.DodecahedronGeometry(0.3,0),ball:new THREE.SphereGeometry(0.2,10,8)};const pjMat={arrow:LM(0xfff0c0,{emissive:0x403010}),rock:LM(0x7a7468),ball:LM(0x202024)};
 function getPJ(k){const m=PJPOOL[k].pop()||new THREE.Mesh(pjGeo[k],pjMat[k]);m.visible=true;scene.add(m);return m;}
-function fire(t,e,S){const y=t.muzzleY*t.g.scale.y+0.3+t.pad.y;const ox=t.x+Math.sin(t.aim)*0.6,oz=t.z+Math.cos(t.aim)*0.6;t.anim=t.type==='catapult'?2.2:0.4;G.stats.shots[t.type]=(G.stats.shots[t.type]||0)+1;
+function fire(t,e,S){t.nShots=(t.nShots||0)+1;const y=t.muzzleY*t.g.scale.y+0.3+t.pad.y;const ox=t.x+Math.sin(t.aim)*0.6,oz=t.z+Math.cos(t.aim)*0.6;t.anim=t.type==='catapult'?2.2:0.4;G.stats.shots[t.type]=(G.stats.shots[t.type]||0)+1;
  if(t.type==='archer'){const n=t.lvl===2?2:1;for(let k=0;k<n;k++){const tg=k?(findTarget(t.x,t.z,S.range,new Set([e]))||e):e;PJ.push({k:'arrow',m:getPJ('arrow'),x:ox,y,z:oz,tg,spd:30,dmg:S.dmg,kind:'arrow'});}AU.play('bow');}
  else if(t.type==='cannon'){for(const b of t.barrels){PJ.push({k:'ball',m:getPJ('ball'),x:ox,y,z:oz,tg:e,spd:24,dmg:S.dmg/t.barrels.length,kind:'pierce'});}for(let i=0;i<10;i++){SMOKE.emit(ox+Math.sin(t.aim)*0.9,y,oz+Math.cos(t.aim)*0.9,Math.sin(t.aim)*2+(rnd()-0.5),0.5+rnd(),Math.cos(t.aim)*2+(rnd()-0.5),1.2,0.55,0.52,0.48,0.55);FIRE.emit(ox+Math.sin(t.aim)*1.2,y,oz+Math.cos(t.aim)*1.2,Math.sin(t.aim)*4,0,Math.cos(t.aim)*4,0.15,1,0.8,0.4,1);}AU.play('cannon');}
  else if(t.type==='catapult'){const T=1.3;const ps=Math.min(PLEN-0.1,e.s+e.T.spd*e.slowF*(T+0.25));const p=pathAt(ps);PJ.push({k:'rock',m:getPJ('rock'),x0:t.x,y0:y+0.8,z0:t.z,x1:p.x,z1:p.z,t:0,T:T+0.25,dmg:S.dmg,splash:S.splash,x:t.x,y:y,z:t.z,delay:0.3});PJ[PJ.length-1].m.visible=false;AU.play('cata');}
@@ -556,9 +561,9 @@ function towerIcon(type){if(iconCache[type])return iconCache[type];const c=docum
 function openSheet(pad){G.sel=pad;renderSheet();$('sheet').classList.remove('hidden');}
 function closeSheet(){G.sel=null;$('sheet').classList.add('hidden');showRange(0,0,0);}
 function renderSheet(){const p=G.sel,s=$('sheet');if(!p)return;const t=p.tower;
- if(!t){showRange(p.x,p.z,0);s.innerHTML='<h3>'+(p.y?'Wall platform: +15% range':'Build on ruins')+'<button class="btn" data-a="x">✕</button></h3><div class="grid4">'+Object.keys(TT).map(k=>{const T=TT[k];return `<button class="btn tb" data-b="${k}" ${G.gold<T.cost?'disabled':''}><img src="${towerIcon(k)}" width="44" height="44" alt=""><span>${T.name.split(' ')[0]}</span><span class="cost">${T.cost}g</span><small>${T.desc}</small></button>`;}).join('')+'</div>';}
+ if(!t){showRange(p.x,p.z,0);s.innerHTML='<h3>'+(p.corner?'Corner tower: wizards only':p.y?'Wall platform: +15% range':'Build on ruins')+'<button class="btn" data-a="x">✕</button></h3><div class="grid4">'+Object.keys(TT).filter(k=>!p.corner||k==='wizard').map(k=>{const T=TT[k];return `<button class="btn tb" data-b="${k}" ${G.gold<T.cost?'disabled':''}><img src="${towerIcon(k)}" width="44" height="44" alt=""><span>${T.name.split(' ')[0]}</span><span class="cost">${T.cost}g</span><small>${T.desc}</small></button>`;}).join('')+'</div>';}
  else{const S=stat(t),T=t.T;showRange(t.x,t.z,S.range,t.pad.y);const up=t.lvl<2?T.up[t.lvl+1]:0;const N=t.lvl<2?T.lv[t.lvl+1]:null;
-  let st=`Damage <b>${S.dmg}</b>${N?' → '+N.dmg:''} · Rate <b>${(1/S.rate).toFixed(1)}/s</b> · Range <b>${S.range}</b>${t.pad.y?' <span style="color:#9fe070">(+15% wall height)</span>':''}`;if(S.splash)st+=` · Splash ${S.splash}`;if(S.jumps)st+=` · Chains ${S.jumps} · Slow ${S.slow*100}%`;if(t.type==='cannon')st+=' · Pierces armour';if(t.type==='archer'&&t.lvl===2)st+=' · Twin archers';
+  let st=`Damage <b>${S.dmg}</b>${N?' → '+N.dmg:''} · Rate <b>${(1/S.rate).toFixed(1)}/s</b> · Range <b>${S.range}</b>${t.pad.corner?' <span style="color:#9fe070">(corner tower reach)</span>':t.pad.y?' <span style="color:#9fe070">(+15% wall height)</span>':''}`;if(S.splash)st+=` · Splash ${S.splash}`;if(S.jumps)st+=` · Chains ${S.jumps} · Slow ${S.slow*100}%`;if(t.type==='cannon')st+=' · Pierces armour';if(t.type==='archer'&&t.lvl===2)st+=' · Twin archers';
   s.innerHTML=`<h3><span><img src="${towerIcon(t.type)}" width="22" height="22" style="vertical-align:middle"> ${T.name} <span class="pips">${[0,1,2].map(i=>'<span class="'+(i<=t.lvl?'f':'')+'"></span>').join('')}</span></span><button class="btn" data-a="x">✕</button></h3><div class="stats">${st}</div>
   <div class="row"><button class="btn" data-a="up" ${(!N||G.gold<up)?'disabled':''}>${N?'Upgrade '+up+'g':'Max level'}</button><button class="btn" data-a="sell">Sell +${Math.floor(t.spent*0.7)}g</button></div>`;}}
 $('sheet').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;AU.play('click');const p=G.sel;if(!p)return;
@@ -609,8 +614,8 @@ requestAnimationFrame(frame);
 window.__TD={G,PADS,TT,ET,cam,begin,startWave,buildTower,upgradeTower,sellTower,openSheet,closeSheet,applyCam,fitCam,
  sim(sec){let t=sec;while(t>0&&G.state==='play'){const d=Math.min(t,1/30);step(d);t-=d;}ui();},
  render(){applyCam();renderer.render(scene,camera);},info:()=>renderer.info.render,
- autoBuild(){const order=['archer','cannon','wizard','catapult'];const pads=PADS.slice().sort((a,b)=>(b.y-a.y)||Math.abs(a.x)-Math.abs(b.x));let i=G.towers.length;let changed=true;
+ autoBuild(useCorners){const order=['archer','cannon','wizard','catapult'];const pads=PADS.filter(p=>!p.corner).sort((a,b)=>(b.y-a.y)||Math.abs(a.x)-Math.abs(b.x));let i=G.towers.length;let changed=true;
   while(changed){changed=false;const lowest=G.towers.slice().sort((a,b)=>a.lvl-b.lvl)[0];if(lowest&&lowest.lvl<2&&G.towers.length>=6&&G.gold>=lowest.T.up[lowest.lvl+1]){upgradeTower(lowest);changed=true;continue;}
-   const p=pads.find(p=>!p.tower);if(!p)break;const ty=order[G.towers.length%4];if(G.gold>=TT[ty].cost){buildTower(p,ty);changed=true;}}}};
+   const p=pads.find(p=>!p.tower);if(!p)break;const ty=order[G.towers.length%4];if(G.gold>=TT[ty].cost){buildTower(p,ty);changed=true;}}if(useCorners)for(const p of PADS)if(p.corner&&!p.tower&&G.gold>=TT.wizard.cost+150)buildTower(p,'wizard');}};
 </script>
 </body></html>

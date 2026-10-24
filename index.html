@@ -550,7 +550,7 @@ function updateWaves(dt){for(let i=G.queues.length-1;i>=0;i--){const q=G.queues[
 function saveBest(w){if(w>G.best){G.best=w;try{localStorage.setItem('orcattack.best',w);}catch(e){}}}
 function step(dt){G.time+=dt;updateWaves(dt);updateEnemies(dt);updateTowers(dt);updateProjectiles(dt);}
 function resetGame(endless){for(const e of G.enemies){scene.remove(e.root);scene.remove(e.bar);POOL[e.type].push(e);}for(const t of [...G.towers])sellTower(t);for(let i=PJ.length-1;i>=0;i--)retire(PJ[i],i);
- Object.assign(G,{state:'play',endless:!!endless,gold:200,lives:20,wave:0,enemies:[],towers:[],queues:[],waveOpen:{},speed:1,paused:false,time:0,stats:{kills:0,built:0,shots:{}},sel:null});closeSheet();ui();}
+ Object.assign(G,{state:'play',endless:!!endless,gold:60,lives:20,wave:0,enemies:[],towers:[],queues:[],waveOpen:{},speed:1,paused:false,time:0,stats:{kills:0,built:0,shots:{}},sel:null});closeSheet();ui();}
 function gameOver(win){if(G.state!=='play')return;G.state=win?'won':'lost';AU.setIntensity(0);AU.play(win?'win':'lose');saveBest(win?G.wave:G.wave-1);
  $('overT').textContent=win?'Victory! The Orc Attack Is Broken':'The Orcs Have Taken the Keep';$('overP').textContent=(win?'All '+WIN_WAVE+' waves repelled. ':'You held until wave '+G.wave+'. ')+G.stats.kills+' orcs slain. Best wave: '+G.best+'.';
  $('bCont').style.display=win?'':'none';$('over').classList.remove('hidden');closeSheet();}

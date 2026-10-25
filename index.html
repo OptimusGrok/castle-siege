@@ -272,7 +272,7 @@ function softTex(){const c=document.createElement('canvas');c.width=c.height=64;
 const SOFT=softTex();
 // ---------- level select: Level 1 = lava cave (default, internal LEVEL 2), Level 2 = castle (?level=2 or ?level=castle, internal LEVEL 1) ----------
 const LEVEL=(()=>{try{const m=location.search.match(/[?&]level=(\w+)/);if(m&&(m[1]==='2'||m[1]==='castle'))return 1;}catch(e){}return 2;})();
-const LOCKED=t=>LEVEL===2&&t==='wizard';
+const LOCKED=t=>LEVEL===2&&t==='wizard'&&!(typeof G!=='undefined'&&G.unlocked);
 // ---------- path ----------
 const PATHPTS=LEVEL===2?[[-18,-36],[-18,8],[-12,14],[12,14],[18,8],[18,-36]]:[[-49,-11],[-14,-11],[-14,6],[-4,6],[-4,-8],[8,-8],[8,10],[16,10],[16,0],[21.6,0]];
 const SEG=[];let PLEN=0;
@@ -912,7 +912,7 @@ const PORTAL=(function(){const CHARGE=60,LAST=15;const P={charge:0,ready:false,p
  function valid(x,z){const r=pathS(x,z);return r.d<1.7&&r.s>4&&r.s<PLEN-3?r:null;}
  function flash(x,z){for(let i=0;i<30;i++)SPARK.emit(x+(Math.random()-0.5)*1.2,0.4+Math.random()*2.4,z+(Math.random()-0.5)*1.2,(Math.random()-0.5)*5,1+Math.random()*4,(Math.random()-0.5)*5,0.6,0.75,0.35,1,1);}
  P.reset=()=>{P.charge=0;P.ready=false;P.placing=false;P.active=null;mesh.visible=ghost.visible=false;P.ui();};
- P.locked=LEVEL===2;P.toggle=()=>{if(P.locked){AU.play('click');floater('Portal unlocks in Level 2');return;}if(G.state!=='play'||P.active)return;if(!P.ready){AU.play('click');return;}P.placing=!P.placing;ghost.visible=false;AU.play('click');P.ui();};
+ P.locked=LEVEL===2;P.toggle=()=>{if(P.locked){AU.play('click');floater('Portal unlocks after wave 6');return;}if(G.state!=='play'||P.active)return;if(!P.ready){AU.play('click');return;}P.placing=!P.placing;ghost.visible=false;AU.play('click');P.ui();};
  P.cancel=()=>{if(P.placing){P.placing=false;ghost.visible=false;P.ui();}};
  P.hover=(x,z)=>{if(!P.placing)return;const r=pathS(x,z);ghost.visible=true;const v=valid(x,z);if(v)orient(ghost,v.s);else{ghost.position.set(x,0,z);}ghost.userData.ring.material.color.setHex(v?0xb060ff:0xff4040);};
  P.place=(x,z)=>{if(P.locked||!P.placing)return false;const v=valid(x,z);if(!v){AU.play('click');return false;}P.placing=false;ghost.visible=false;P.ready=false;P.charge=0;P.active={s:v.s,t:LAST};orient(mesh,v.s);mesh.visible=true;AU.play('portal');flash(mesh.position.x,mesh.position.z);P.ui();return true;};
@@ -922,14 +922,14 @@ const PORTAL=(function(){const CHARGE=60,LAST=15;const P={charge:0,ready:false,p
    if(A.t<=0){P.active=null;mesh.visible=false;for(const e of G.enemies)e._pl=undefined;}}
   P.ui();};
  P.anim=(rt)=>{for(const g of [mesh,ghost]){if(!g.visible)continue;const u=g.userData;u.disc.rotation.z=-rt*3;u.gl.rotation.y=rt*2;const fade=g===mesh&&P.active?Math.min(1,P.active.t/2.5):0.45;const pul=1+Math.sin(rt*6)*0.05;u.disc.scale.setScalar(pul*(g===mesh?0.6+0.4*Math.min(1,(LAST-P.active.t)/0.4):1));u.disc.material.opacity=fade;u.ring.material.opacity=fade;u.gl.material.opacity=fade*0.7;}};
- let lastTxt='';P.ui=()=>{const b=document.getElementById('bPortal');if(!b)return;const pct=P.active?P.active.t/LAST:P.charge/CHARGE;b.style.setProperty('--p',(pct*360).toFixed(1)+'deg');b.classList.toggle('ready',P.ready&&!P.placing);b.classList.toggle('placing',P.placing);b.classList.toggle('active',!!P.active);b.classList.toggle('idle',!P.active&&!P.ready&&!P.waveOn);b.classList.toggle('locked',!!P.locked);if(P.locked){if(lastTxt!=='L'){b.querySelector('span').textContent='\u{1F512}';b.title='Portal locked: unlocks in Level 2';lastTxt='L';}return;}
+ let lastTxt='';P.ui=()=>{const b=document.getElementById('bPortal');if(!b)return;const pct=P.active?P.active.t/LAST:P.charge/CHARGE;b.style.setProperty('--p',(pct*360).toFixed(1)+'deg');b.classList.toggle('ready',P.ready&&!P.placing);b.classList.toggle('placing',P.placing);b.classList.toggle('active',!!P.active);b.classList.toggle('idle',!P.active&&!P.ready&&!P.waveOn);b.classList.toggle('locked',!!P.locked);if(P.locked){if(lastTxt!=='L'){b.querySelector('span').textContent='\u{1F512}';b.title='Portal locked: unlocks after wave 6';lastTxt='L';}return;}
   const t=P.active?Math.ceil(P.active.t)+'s':P.ready?(P.placing?'✕':''):Math.ceil(CHARGE-P.charge)+'s';if(t!==lastTxt){b.querySelector('span').textContent=t;lastTxt=t;}b.title=P.placing?'Tap the path to place the portal (Esc to cancel)':P.ready?'Portal ready: tap, then tap the path':P.active?'Portal open':P.waveOn?'Portal charging':'Portal charges during waves';};
  P.pathS=pathS;P.valid=valid;P.mesh=mesh;
  return P;})();
 
 // ---- 30_game.js
 const $=id=>document.getElementById(id);
-const WIN_WAVE=20;
+const WIN_WAVE=LEVEL===2?12:20;
 const G={state:'title',mode:'normal',gold:0,lives:0,wave:0,enemies:[],towers:[],queues:[],speed:1,paused:false,time:0,fps:60,stats:{kills:0,built:0,shots:{}},sel:null,best:0};
 try{const o=localStorage.getItem('cs.best');if(o!==null&&localStorage.getItem('orcattack.best')===null)localStorage.setItem('orcattack.best',o);G.best=+localStorage.getItem('orcattack.best')||0;}catch(e){}
 function hpMul(w){return 1.067*(1+0.15*(w-1)+0.016*(w-1)*(w-1));}
@@ -938,22 +938,34 @@ function waveDef(w){const g=[];const f=Math.floor,c=Math.min(2,1.1+0.04*w),E=3.2
  else if(w%5===0){g.push({t:'brute',n:f((3+w/2)*c),gap:1.2,d:0});g.push({t:'goblin',n:f((10+w)*c),gap:0.28,d:3});g.push({t:'grunt',n:w,gap:0.6,d:9});g.push({t:'brute',n:1+f(w/5),gap:3,d:12,m:E});}
  else{g.push({t:'goblin',n:f((4+w*1.4)*c),gap:0.45,d:0});if(w>=2)g.push({t:'grunt',n:f((1+w)*c),gap:0.8,d:3});if(w>=4)g.push({t:"brute",n:Math.max(1,f((w-2)/1.6)),gap:1.9,d:6});
   if(w%3===0)g.push({t:'goblin',n:f((6+w)*c),gap:0.25,d:10});if(w>=8)g.push({t:'grunt',n:w,gap:0.45,d:13});if(w>=4&&w%2===0)g.push({t:'brute',n:1+f(w/8),gap:2.5,d:16,m:E});if(w===7||w===13||w===17)g.push({t:'warlord',n:1,gap:5,d:18,m:0.35});}
- if(LEVEL===2){const n=f((3+w*1.3)*c);g.push({t:'skel',n,gap:0.32,d:0.8});if(w>=3)g.push({t:'skel',n:f(n*0.7),gap:0.24,d:8});if(w%5===0)g.push({t:'skel',n:f(n*0.8),gap:0.2,d:15});}
  return g;}
-function isBoss(w){return w%10===0;}
+// Lava Cave: 12 hand-tuned waves, orcs mixed with skeletons; elite brutes on 6 & 9, mini-warlord on 10, Warlord boss on 12
+function lavaWaveDef(w){const g=[],E=3.2,f=Math.floor;
+ g.push({t:'goblin',n:3+f(w*1.4),gap:0.9-Math.min(0.4,w*0.04),d:0});
+ g.push({t:'skel',n:2+f(w*1.3),gap:0.7-Math.min(0.35,w*0.03),d:3});
+ if(w>=3)g.push({t:'grunt',n:f(w*0.9),gap:1.0,d:6});
+ if(w>=5)g.push({t:'brute',n:f((w-3)/2),gap:2.2,d:9});
+ if(w>=7)g.push({t:'skel',n:4+w,gap:0.25,d:12});
+ if(w>=8)g.push({t:'grunt',n:w,gap:0.5,d:15});
+ if(w===6||w===9)g.push({t:'brute',n:1,gap:3,d:14,m:E});
+ if(w===10)g.push({t:'warlord',n:1,gap:5,d:16,m:0.4});
+ if(w===12){g.push({t:'brute',n:2,gap:3,d:12,m:E});g.push({t:'warlord',n:1,gap:9,d:18});}
+ return g;}
+function isBoss(w){return LEVEL===2?w===12:w%10===0;}
 function startWave(){if(G.state!=='play')return;const early=G.queues.length>0||G.enemies.some(e=>!e.dead);if(!G.endless&&G.wave>=WIN_WAVE)return;
  if(early){const b=10+G.wave*2;G.gold+=b;floater('Early call +'+b);}
- G.wave++;const mul=hpMul(G.wave);for(const q of waveDef(G.wave))G.queues.push({t:q.t,n:q.n,gap:q.gap,next:q.d,mul:mul*(q.m||1),el:q.m||1,w:G.wave});
+ G.wave++;const mul=hpMul(G.wave);for(const q of (LEVEL===2?lavaWaveDef:waveDef)(G.wave))G.queues.push({t:q.t,n:q.n,gap:q.gap,next:q.d,mul:mul*(q.m||1),el:q.m||1,w:G.wave});
  G.waveOpen=G.waveOpen||{};G.waveOpen[G.wave]=true;
  if(isBoss(G.wave)){banner('BOSS WAVE '+G.wave,'The Orc Warlord approaches!');AU.play('boss');}else if(G.wave%5===0){banner('Wave '+G.wave,'Armoured brutes!');AU.play('horn');}else{banner('Wave '+G.wave);AU.play('horn');}
  AU.setIntensity(isBoss(G.wave)?2:1);ui();}
 function updateWaves(dt){for(let i=G.queues.length-1;i>=0;i--){const q=G.queues[i];q.next-=dt;while(q.next<=0&&q.n>0){spawnEnemy(q.t,q.mul,-q.next*ET[q.t].spd,q.el);q.n--;q.next+=q.gap;}if(q.n<=0)G.queues.splice(i,1);}
- if(G.state==='play'&&G.waveOpen&&G.queues.length===0&&G.enemies.length===0){const ws=Object.keys(G.waveOpen);if(ws.length){G.waveOpen={};const b=30+G.wave*6;G.gold+=b;floater('Wave cleared +'+b);AU.setIntensity(0);saveBest(G.wave);
+ if(G.state==='play'&&G.waveOpen&&G.queues.length===0&&G.enemies.length===0){const ws=Object.keys(G.waveOpen);if(ws.length){G.waveOpen={};const b=30+G.wave*6;G.gold+=b;floater('Wave cleared +'+b);AU.setIntensity(0);saveBest(G.wave);if(LEVEL===2&&!G.unlocked&&G.wave>=6)unlockLava();
    if(!G.endless&&G.wave>=WIN_WAVE){gameOver(true);return;}ui();}}}
+function unlockLava(){G.unlocked=true;PORTAL.locked=false;PORTAL.charge=0;PORTAL.ready=false;PORTAL.ui();banner('Wizard Tower & Portal unlocked!','Build wizards and open the portal');AU.play('portalReady');setTimeout(()=>AU.play('coin'),180);if(G.sel&&!$('sheet').classList.contains('hidden'))renderSheet();}
 function saveBest(w){if(w>G.best){G.best=w;try{localStorage.setItem('orcattack.best',w);}catch(e){}}}
 function step(dt){G.time+=dt;updateWaves(dt);updateEnemies(dt);updateTowers(dt);updateProjectiles(dt);BLOOD.update(dt);PORTAL.update(dt);}
 function resetGame(endless){PORTAL.reset();BLOOD.D.length=0;BLOOD.update(0);for(const e of G.enemies){scene.remove(e.root);scene.remove(e.bar);POOL[e.type].push(e);}for(const t of [...G.towers])sellTower(t);for(let i=PJ.length-1;i>=0;i--)retire(PJ[i],i);
- Object.assign(G,{state:'play',endless:!!endless,gold:180,lives:20,wave:0,enemies:[],towers:[],queues:[],waveOpen:{},speed:1,paused:false,time:0,stats:{kills:0,built:0,shots:{}},sel:null});closeSheet();ui();}
+ Object.assign(G,{state:'play',endless:!!endless,gold:180,lives:20,wave:0,enemies:[],towers:[],queues:[],waveOpen:{},speed:1,paused:false,time:0,stats:{kills:0,built:0,shots:{}},sel:null,unlocked:false});PORTAL.locked=LEVEL===2;PORTAL.ui();closeSheet();ui();}
 function gameOver(win){if(G.state!=='play')return;G.state=win?'won':'lost';AU.setIntensity(0);AU.play(win?'win':'lose');saveBest(win?G.wave:G.wave-1);
  $('overT').textContent=win?'Victory! The Orc Attack Is Broken':'The Orcs Have Taken the Keep';$('overP').textContent=(win?'All '+WIN_WAVE+' waves repelled. ':'You held until wave '+G.wave+'. ')+G.stats.kills+' orcs slain. Best wave: '+G.best+'.';
  $('bCont').style.display=win?'':'none';$('bNext').style.display=win&&LEVEL===2?'':'none';$('over').classList.remove('hidden');closeSheet();}
@@ -977,7 +989,7 @@ function towerIcon(type){if(iconCache[type])return iconCache[type];const c=docum
 function openSheet(pad){G.sel=pad;renderSheet();$('sheet').classList.remove('hidden');}
 function closeSheet(){G.sel=null;$('sheet').classList.add('hidden');showRange(0,0,0);}
 function renderSheet(){const p=G.sel,s=$('sheet');if(!p)return;const t=p.tower;
- if(!t){showRange(p.x,p.z,0);s.innerHTML='<h3>'+(p.y?'Wall platform: +15% range':'Build on ruins')+'<button class="btn" data-a="x">✕</button></h3><div class="grid4">'+Object.keys(TT).map(k=>{const T=TT[k];if(LOCKED(k))return `<button class="btn tb locked" data-lock="${k}" disabled title="Unlocks in Level 2"><img src="${towerIcon(k)}" width="44" height="44" alt=""><span>\u{1F512} ${T.name.split(' ')[0]}</span><span class="cost">Locked</span><small>Unlocks in Level 2</small></button>`;return `<button class="btn tb" data-b="${k}" ${G.gold<T.cost?'disabled':''}><img src="${towerIcon(k)}" width="44" height="44" alt=""><span>${T.name.split(' ')[0]}</span><span class="cost">${T.cost}g</span><small>${T.desc}</small></button>`;}).join('')+'</div>';}
+ if(!t){showRange(p.x,p.z,0);s.innerHTML='<h3>'+(p.y?'Wall platform: +15% range':'Build on ruins')+'<button class="btn" data-a="x">✕</button></h3><div class="grid4">'+Object.keys(TT).map(k=>{const T=TT[k];if(LOCKED(k))return `<button class="btn tb locked" data-lock="${k}" disabled title="Unlocks after wave 6"><img src="${towerIcon(k)}" width="44" height="44" alt=""><span>\u{1F512} ${T.name.split(' ')[0]}</span><span class="cost">Locked</span><small>Unlocks after wave 6</small></button>`;return `<button class="btn tb" data-b="${k}" ${G.gold<T.cost?'disabled':''}><img src="${towerIcon(k)}" width="44" height="44" alt=""><span>${T.name.split(' ')[0]}</span><span class="cost">${T.cost}g</span><small>${T.desc}</small></button>`;}).join('')+'</div>';}
  else{const S=stat(t),T=t.T;showRange(t.x,t.z,S.range,t.pad.y);const mx=t.lvl>=LVMAX-1;const up=mx?0:T.up[t.lvl+1];const N=mx?null:Object.assign({},T.lv[t.lvl+1]);if(N&&t.pad.y){t.lvl++;N.range=stat(t).range;t.lvl--;}
   const ar=(a,b,f)=>`<b>${f?f(a):a}</b>${N?' → '+(f?f(b):b):''}`;let st=`Damage ${ar(S.dmg,N&&N.dmg)} · Rate ${ar(1/S.rate,N&&1/N.rate,v=>v.toFixed(2)+'/s')} · Range ${ar(S.range,N&&N.range)}${t.pad.y?' <span style="color:#9fe070">(+15% height)</span>':''}`;
   if(S.splash)st+=` · Splash ${ar(S.splash,N&&N.splash)}`;if(S.jumps)st+=` · Chains ${ar(S.jumps,N&&N.jumps)} · Slow ${ar(Math.round(S.slow*100),N&&Math.round(N.slow*100),v=>v+'%')}`;if(S.arrows)st+=` · Arrows ${ar(S.arrows,N&&N.arrows)}`;if(S.barrels)st+=` · Barrels ${ar(S.barrels,N&&N.barrels)} · Pierces armour`;

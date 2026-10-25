@@ -960,8 +960,9 @@ function startWave(){if(G.state!=='play')return;const early=G.queues.length>0||G
  AU.setIntensity(isBoss(G.wave)?2:1);ui();}
 function updateWaves(dt){for(let i=G.queues.length-1;i>=0;i--){const q=G.queues[i];q.next-=dt;while(q.next<=0&&q.n>0){spawnEnemy(q.t,q.mul,-q.next*ET[q.t].spd,q.el);q.n--;q.next+=q.gap;}if(q.n<=0)G.queues.splice(i,1);}
  if(G.state==='play'&&G.waveOpen&&G.queues.length===0&&G.enemies.length===0){const ws=Object.keys(G.waveOpen);if(ws.length){G.waveOpen={};const b=30+G.wave*6;G.gold+=b;floater('Wave cleared +'+b);AU.setIntensity(0);saveBest(G.wave);if(LEVEL===2&&!G.unlocked&&G.wave>=6)unlockLava();
-   if(!G.endless&&G.wave>=WIN_WAVE){gameOver(true);return;}ui();}}}
+   if(!G.endless&&G.wave>=WIN_WAVE){if(LEVEL===2){nextLevel();return;}gameOver(true);return;}ui();}}}
 function unlockLava(){G.unlocked=true;PORTAL.locked=false;PORTAL.charge=0;PORTAL.ready=false;PORTAL.ui();banner('Wizard Tower & Portal unlocked!','Build wizards and open the portal');AU.play('portalReady');setTimeout(()=>AU.play('coin'),180);if(G.sel&&!$('sheet').classList.contains('hidden'))renderSheet();}
+function nextLevel(){G.state='won';AU.setIntensity(0);AU.play('win');closeSheet();banner('Level 1 complete!','Level 2: The Castle');G.nextAt=performance.now();setTimeout(()=>{location.search='?level=2&go=1';},2000);}
 function saveBest(w){if(w>G.best){G.best=w;try{localStorage.setItem('orcattack.best',w);}catch(e){}}}
 function step(dt){G.time+=dt;updateWaves(dt);updateEnemies(dt);updateTowers(dt);updateProjectiles(dt);BLOOD.update(dt);PORTAL.update(dt);}
 function resetGame(endless){PORTAL.reset();BLOOD.D.length=0;BLOOD.update(0);for(const e of G.enemies){scene.remove(e.root);scene.remove(e.bar);POOL[e.type].push(e);}for(const t of [...G.towers])sellTower(t);for(let i=PJ.length-1;i>=0;i--)retire(PJ[i],i);
@@ -1046,6 +1047,7 @@ function frame(now){requestAnimationFrame(frame);const raw=(now-lastT)/1000;last
  uiAcc+=rdt;if(uiAcc>0.15){uiAcc=0;ui();}
  PORTAL.anim(performance.now()/1000);applyCam();DAY.sync();renderer.render(scene,camera);}
 requestAnimationFrame(frame);
+if(/[?&]go=1/.test(location.search)&&LEVEL===1)setTimeout(()=>{begin(false);banner('Level 2: The Castle');try{history.replaceState(null,'','?level=2');}catch(e){}},50);
 // ---------- test hooks ----------
 window.__TD={PORTAL,G,PADS,TT,ET,cam,begin,startWave,buildTower,upgradeTower,sellTower,openSheet,closeSheet,applyCam,fitCam,
  sim(sec){let t=sec;while(t>0&&G.state==='play'){const d=Math.min(t,1/30);step(d);t-=d;}ui();},DAY,dayUpdate,

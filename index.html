@@ -271,10 +271,10 @@ let seed=1337;function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/214748
 function softTex(){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.4,'rgba(255,255,255,.6)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);}
 const SOFT=softTex();
 // ---------- level select: Level 1 = lava cave (default, internal LEVEL 2), Level 2 = castle (?level=2 or ?level=castle, internal LEVEL 1) ----------
-const LEVEL=(()=>{try{const m=location.search.match(/[?&]level=(\w+)/);if(m&&(m[1]==='2'||m[1]==='castle'))return 1;}catch(e){}return 2;})();
+const LEVEL=(()=>{try{const m=location.search.match(/[?&]level=(\w+)/);if(m&&(m[1]==='2'||m[1]==='castle'))return 1;if(m&&(m[1]==='3'||m[1]==='village'))return 3;}catch(e){}return 2;})();
 const LOCKED=t=>LEVEL===2&&t==='wizard'&&!(typeof G!=='undefined'&&G.unlocked);
 // ---------- path ----------
-const PATHPTS=LEVEL===2?[[-18,-36],[-18,8],[-12,14],[12,14],[18,8],[18,-36]]:[[-49,-11],[-14,-11],[-14,6],[-4,6],[-4,-8],[8,-8],[8,10],[16,10],[16,0],[21.6,0]];
+const PATHPTS=LEVEL===3?[[-50,-18],[-24,-18],[-14,-14],[-14,6],[-6,12],[6,12],[12,5],[22,5],[27,11],[27,46]]:LEVEL===2?[[-18,-36],[-18,8],[-12,14],[12,14],[18,8],[18,-36]]:[[-49,-11],[-14,-11],[-14,6],[-4,6],[-4,-8],[8,-8],[8,10],[16,10],[16,0],[21.6,0]];
 const SEG=[];let PLEN=0;
 for(let i=0;i<PATHPTS.length-1;i++){const [ax,az]=PATHPTS[i],[bx,bz]=PATHPTS[i+1];const len=Math.hypot(bx-ax,bz-az);SEG.push({ax,az,dx:(bx-ax)/len,dz:(bz-az)/len,len,s0:PLEN});PLEN+=len;}
 const _pa={x:0,z:0,dx:0,dz:0};
@@ -282,8 +282,10 @@ function pathAt(s){let g=SEG[SEG.length-1];for(const q of SEG){if(s<=q.s0+q.len)
 function distPath(x,z){let m=1e9;for(const q of SEG){let u=(x-q.ax)*q.dx+(z-q.az)*q.dz;u=Math.max(0,Math.min(q.len,u));m=Math.min(m,Math.hypot(x-(q.ax+q.dx*u),z-(q.az+q.dz*u)));}return m;}
 const KEEP={x:27.9,z:0},KEEPS=2;
 // ---------- pads ----------
-const PADS=[];const RAISED=(LEVEL===2?[[-12.6,-15],[-12.6,-3],[12.6,-15],[12.6,-3],[-5.5,8.4],[5.5,8.4],[0,-9],[-23.6,-8],[23.6,-8],[-23.6,5],[23.6,5],[0,19.4]]:[[-24,-15.2],[-18.6,2.6],[-6.6,-13.6],[4,13.9],[-10.1,-3],[0,-4.1],[4.1,3],[14.77,-3.7]]).filter(c=>distPath(c[0],c[1])>=3.4);const WALLH=2.8;const CORNERS=[[-30,-19],[30,-19],[-30,19],[30,19]],CORNH=7.6,BROKEN=[0,2];
- RAISED.forEach((c,i)=>PADS.push({x:c[0],z:c[1],y:LEVEL===2?1.4:WALLH,raised:true,join:LEVEL===2?false:i>=4,tower:null,i:PADS.length}));
+function riverZ(x){return -3+Math.sin(x*0.08)*2.5;}
+function L3PADS(){const out=[];const side=[1,-1];let k=0;for(let s=8;s<PLEN-14&&out.length<12;s+=7){const p=pathAt(s);for(const sd of side){const o=sd*((k++%2)?4.2:4.6),x=p.x-p.dz*o,z=p.z+p.dx*o;if(distPath(x,z)<3.6||Math.abs(z-riverZ(x))<4.2||Math.abs(x)>38||z>26||z<-24)continue;if(out.some(q=>Math.hypot(q[0]-x,q[1]-z)<7.5))continue;out.push([x,z]);}}return out;}
+const PADS=[];const RAISED=(LEVEL===3?L3PADS():LEVEL===2?[[-12.6,-15],[-12.6,-3],[12.6,-15],[12.6,-3],[-5.5,8.4],[5.5,8.4],[0,-9],[-23.6,-8],[23.6,-8],[-23.6,5],[23.6,5],[0,19.4]]:[[-24,-15.2],[-18.6,2.6],[-6.6,-13.6],[4,13.9],[-10.1,-3],[0,-4.1],[4.1,3],[14.77,-3.7]]).filter(c=>distPath(c[0],c[1])>=3.4);const WALLH=2.8;const CORNERS=[[-30,-19],[30,-19],[-30,19],[30,19]],CORNH=7.6,BROKEN=[0,2];
+ RAISED.forEach((c,i)=>PADS.push({x:c[0],z:c[1],y:LEVEL===2?1.4:LEVEL===3?0.25:WALLH,raised:true,join:LEVEL===1?i>=4:false,tower:null,i:PADS.length}));
 // (ground pads removed: every build spot is now a raised wall platform)
 function nearestPath(x,z){let m=1e9,bx=0,bz=0;for(const q of SEG){let u=(x-q.ax)*q.dx+(z-q.az)*q.dz;u=Math.max(0,Math.min(q.len,u));const px=q.ax+q.dx*u,pz=q.az+q.dz*u,d=Math.hypot(x-px,z-pz);if(d<m){m=d;bx=px;bz=pz;}}return {x:bx,z:bz,d:m};}
 // push ground pads back so a low outer wall fits between them and the path
@@ -678,6 +680,106 @@ const LAVA={};
  renderer.shadowMap.needsUpdate=true;
 })();
 
+// ---- 18_level3.js
+// ---------- Level 3: medieval river village (only when LEVEL===3) ----------
+const VILLAGE={};
+(function level3(){if(LEVEL!==3)return;
+ // strip the castle scenery; keep lights, particles, sky dome, sun/moon and clouds so the day/night cycle still works
+ const keep=new Set([sun,sun.target,_hemi,DAY.dome,DAY.sunS,DAY.moonS,...DAY.clouds]);
+ for(const o of scene.children.slice()){if(keep.has(o)||o.isPoints)continue;scene.remove(o);}
+ FIRES.length=0;BANNERS.length=0;fireLights.length=0;
+ scene.fog=new THREE.Fog(0xa0c0d8,90,190);DAY.t=0.12;
+ let s=2024;const R=()=>(s=(s*16807)%2147483647,(s-1)/2147483646);
+ const col=new THREE.Color();const parts=[];// [geometry, hex] merged into one vertex-colour mesh
+ const P=(geo,hex,x,y,z,ry,rx,rz)=>{geo=geo.index?geo.toNonIndexed():geo;if(rx)geo.rotateX(rx);if(rz)geo.rotateZ(rz);if(ry)geo.rotateY(ry);geo.translate(x,y,z);parts.push([geo,hex]);return geo;};
+ const BX=(w,h,d)=>new THREE.BoxGeometry(w,h,d),CY=(r1,r2,h,n)=>new THREE.CylinderGeometry(r1,r2,h,n||8);
+ const RW=3.1;// river half-width
+ const dRiver=(x,z)=>Math.abs(z-riverZ(x));
+ const free=(x,z,r)=>distPath(x,z)>r+1.9&&!nearPad(x,z,r+1.9)&&dRiver(x,z)>RW+r+0.6;
+ // ---- ground: grass with dirt path, carved river bed ----
+ {const W=150,H=130,g=new THREE.PlaneGeometry(W,H,150,130);g.rotateX(-Math.PI/2);g.translate(0,0,6);const p=g.attributes.position,c=new Float32Array(p.count*3);
+  const grass=new THREE.Color(0x5f9a3a),grass2=new THREE.Color(0x7fb04a),dark=new THREE.Color(0x3a6a2a),dirt=new THREE.Color(0x9a7448),mud=new THREE.Color(0x6a5a40),sand=new THREE.Color(0xb8a070);
+  for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),n=fbm(x*0.15,z*0.15);col.copy(grass).lerp(grass2,Math.min(1,Math.max(0,n*1.8-0.5)));
+   const edge=Math.max(0,Math.min(1,(Math.max(Math.abs(x)-34,-z-22,0))/10));col.lerp(dark,edge*0.8);
+   const dp=distPath(x,z);if(dp<2.4)col.lerp(dirt,Math.min(1,(2.4-dp)/0.9)*(0.85+0.15*vnoise(x*2,z*2)));
+   const dr=dRiver(x,z);let y=(n-0.5)*0.3;if(dr<RW+1.2){const t=Math.max(0,1-(dr-RW+0.2)/1.4);y=y*(1-t)-1.3*Math.min(1,t*1.2);col.lerp(dr<RW?mud:sand,Math.min(1,t*1.5));}
+   if(dp<2)y=Math.max(y,0)*0.3;p.setY(i,y);const v=0.9+hash(x,z)*0.18;c[i*3]=col.r*v;c[i*3+1]=col.g*v;c[i*3+2]=col.b*v;}
+  g.setAttribute('color',new THREE.BufferAttribute(c,3));g.computeVertexNormals();const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true}));m.receiveShadow=true;m.name='villageGround';scene.add(m);}
+ // dirt path ribbon (slightly raised, rounded at corners)
+ {const cv=document.createElement('canvas');cv.width=cv.height=128;const x=cv.getContext('2d');x.fillStyle='#9a7650';x.fillRect(0,0,128,128);for(let i=0;i<900;i++){const v=110+R()*70|0;x.fillStyle=`rgba(${v},${v*0.78|0},${v*0.52|0},${0.25+R()*0.4})`;x.fillRect(R()*128,R()*128,1+R()*3,1+R()*3);}
+  for(let i=0;i<40;i++){x.fillStyle='rgba(70,55,35,.35)';x.beginPath();x.ellipse(R()*128,R()*128,2+R()*5,1+R()*2,R()*3,0,7);x.fill();}
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;const mat=new THREE.MeshLambertMaterial({map:t,transparent:false,polygonOffset:true,polygonOffsetFactor:-2});
+  SEG.forEach((q,i)=>{const L=q.len;const g=new THREE.PlaneGeometry(2.9,L);g.rotateX(-Math.PI/2);const uv=g.attributes.uv;for(let k=0;k<uv.count;k++)uv.setY(k,uv.getY(k)*L/2.9+i*0.7);const m=new THREE.Mesh(g,mat);m.position.set(q.ax+q.dx*L/2,0.06+i*0.002,q.az+q.dz*L/2);m.rotation.y=Math.atan2(q.dx,q.dz);m.receiveShadow=true;scene.add(m);});
+  PATHPTS.forEach(([x,z],i)=>{if(i===0||i===PATHPTS.length-1)return;const d=new THREE.Mesh(new THREE.CircleGeometry(1.45,20).rotateX(-Math.PI/2),mat);d.position.set(x,0.07,z);d.receiveShadow=true;scene.add(d);});}
+ // ---- river water (animated shader) ----
+ const wu={t:{value:0}};VILLAGE.wu=wu;
+ {const g=new THREE.PlaneGeometry(160,2*RW+1.2,160,1);g.rotateX(-Math.PI/2);const p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i);p.setZ(i,p.getZ(i)+riverZ(x));}
+  const m=new THREE.Mesh(g,new THREE.ShaderMaterial({uniforms:wu,transparent:true,
+   vertexShader:'varying vec2 vW;void main(){vec4 w=modelMatrix*vec4(position,1.0);vW=w.xz;gl_Position=projectionMatrix*viewMatrix*w;}',
+   fragmentShader:'uniform float t;varying vec2 vW;float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}void main(){vec2 p=vW*vec2(.35,.9)+vec2(-t*.6,0.);float a=n(p)*.6+n(p*2.3+vec2(-t*.9,1.))*.4;vec3 c=mix(vec3(.10,.36,.66),vec3(.22,.58,.86),a);float foam=smoothstep(.72,.8,a);c=mix(c,vec3(.85,.95,1.),foam*.7);gl_FragColor=vec4(c,.92);}'}));
+  m.position.y=-0.42;m.name='river';scene.add(m);}
+ // ---- stone arch bridge where the path crosses the river ----
+ {let bx=0,bz=0,best=1e9;for(let t=0;t<PLEN;t+=0.25){const p=pathAt(t),d=dRiver(p.x,p.z);if(d<best){best=d;bx=p.x;bz=p.z;}}VILLAGE.bridge={x:bx,z:bz};
+  const L=2*RW+3.4,ST=0x8a8680,STD=0x6e6a64;P(BX(3.6,0.5,L),ST,bx,-0.2,bz);for(const sd of [1,-1]){P(BX(0.35,0.55,L),STD,bx+sd*1.85,0.3,bz);for(let k=0;k<5;k++)P(BX(0.42,0.3,0.42),ST,bx+sd*1.85,0.7,bz-L/2+0.4+k*(L-0.8)/4);}
+  for(const dz of [-RW*0.55,RW*0.55]){P(BX(3.4,0.9,0.7),STD,bx,-0.85,bz+dz);}// piers
+  for(const sd of [1,-1])for(const dz of [-RW*0.55,0,RW*0.55]){const a=new THREE.TorusGeometry(1.0,0.22,5,10,Math.PI);P(a,STD,bx+sd*1.82,-1.05,bz+dz*0.0+dz,Math.PI/2);}
+  for(const sd of [-1,1])for(let k=0;k<5;k++)P(new THREE.DodecahedronGeometry(0.4+R()*0.35,0),0x7a7670,bx+(R()-0.5)*5,-0.3,bz+sd*(RW+0.8+R()*1.2));}
+ // ---- builders ----
+ function gable(span,hgt,len,alongX){const sh=new THREE.Shape();sh.moveTo(-span/2,0);sh.lineTo(span/2,0);sh.lineTo(0,hgt);sh.closePath();const g=new THREE.ExtrudeGeometry(sh,{depth:len,bevelEnabled:false});g.translate(0,0,-len/2);if(alongX)g.rotateY(Math.PI/2);return g;}
+ function cottage(x,z,ry,sc){sc=sc||1;const g=[];const w=3.2*sc,d=2.6*sc,h=2*sc;const add=(geo,hex,px,py,pz)=>{geo=geo.index?geo.toNonIndexed():geo;geo.translate(px,py,pz);g.push([geo,hex]);};
+  add(BX(w+0.3,0.3,d+0.3),0x6a6660,0,0.15,0);add(BX(w,h,d),0xe8dcc0,0,0.3+h/2,0);
+  const T=0x4a3020;for(const sd of [1,-1]){add(BX(w+0.06,0.16,0.08),T,0,0.38,sd*(d/2+0.02));add(BX(w+0.06,0.16,0.08),T,0,0.3+h,sd*(d/2+0.02));for(let k=0;k<4;k++)add(BX(0.16,h,0.08),T,-w/2+0.08+k*(w-0.16)/3,0.3+h/2,sd*(d/2+0.02));
+   const br=BX(0.12,h*1.15,0.08);br.rotateZ(sd*0.9);add(br,T,-w/4,0.3+h/2,sd*(d/2+0.03));add(BX(0.08,h,0.16),T,sd*(w/2+0.02),0.3+h/2,0);}
+  add(BX(0.7,1.2,0.1),0x5a3a20,0.6*sc,0.9,d/2+0.06);add(BX(0.6,0.5,0.1),0x2a3040,-0.8*sc,1.4,d/2+0.06);add(BX(0.6,0.5,0.1),0x2a3040,-0.8*sc,1.4,-d/2-0.06);
+  add(gable(d+0.9,1.6*sc,w+0.7,true),0xc8a050,0,0.3+h-0.05,0);
+  add(BX(0.5,1.4,0.5),0x7a7068,w*0.3,0.3+h+1.4,-d*0.15);
+  for(const [geo,hex] of g){geo.rotateY(ry);geo.translate(x,0,z);parts.push([geo,hex]);}}
+ function chapel(x,z,ry){const g=[];const add=(geo,hex,px,py,pz)=>{geo=geo.index?geo.toNonIndexed():geo;geo.translate(px,py,pz);g.push([geo,hex]);};
+  add(BX(3.4,3,5),0xa8a49c,0,1.5,0);add(gable(4.1,2.1,5.5,false),0x3a64b8,0,2.95,0);
+  add(BX(1.6,5.2,1.6),0x9a968e,0,2.6,2.8);const sp=new THREE.ConeGeometry(1.25,2.6,4);sp.rotateY(Math.PI/4);add(sp,0x3a64b8,0,6.5,2.8);add(BX(0.12,0.9,0.12),0xd8c070,0,8.2,2.8);add(BX(0.55,0.12,0.12),0xd8c070,0,8.3,2.8);
+  add(BX(0.9,1.5,0.1),0x5a3a20,0,0.75,3.62);for(const sd of [1,-1])add(BX(0.1,1,0.5),0x3a4a70,sd*1.72,1.8,-0.6);
+  for(const [geo,hex] of g){geo.rotateY(ry);geo.translate(x,0,z);parts.push([geo,hex]);}}
+ function well(x,z){P(CY(0.95,1.05,0.9,12),0x8a8680,x,0.45,z);P(CY(0.75,0.75,0.92,12),0x1a3a5a,x,0.47,z);for(const sd of [1,-1])P(BX(0.16,1.8,0.16),0x5a3a20,x+sd*0.85,1.3,z);P(CY(0.08,0.08,1.9,6),0x4a3020,x,2.0,z,0,0,Math.PI/2);
+  const r=new THREE.CylinderGeometry(0.01,1.35,0.9,4,1);r.rotateY(Math.PI/4);P(r,0x8a5a30,x,2.55,z);P(BX(0.3,0.3,0.3),0x6a4a2a,x+0.2,1.4,z);}
+ const awn=[];function stall(x,z,ry,c1){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;const L=(geo,c)=>{const m=new THREE.Mesh(geo,LM(c));m.castShadow=true;g.add(m);return m;};
+  for(const [px,pz] of [[-1.1,-0.7],[1.1,-0.7],[-1.1,0.7],[1.1,0.7]])L(BX(0.12,1.9,0.12),0x5a3a20).position.set(px,0.95,pz);L(BX(2.4,0.12,1.3),0x7a5230).position.set(0,0.9,0.2);
+  for(let k=0;k<4;k++)L(new THREE.SphereGeometry(0.15,6,4),[0xd04020,0xe0b030,0x60a030,0xa05030][k]).position.set(-0.8+k*0.5,1.06,0.3);L(BX(0.5,0.4,0.4),0x8a6a3a).position.set(1.5,0.2,0.7);
+  const cv=document.createElement('canvas');cv.width=64;cv.height=8;const x2=cv.getContext('2d');for(let k=0;k<8;k++){x2.fillStyle=k%2?'#f4f0e8':c1;x2.fillRect(k*8,0,8,8);}const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;
+  const a=new THREE.Mesh(new THREE.PlaneGeometry(2.7,1.7),new THREE.MeshLambertMaterial({map:t,side:THREE.DoubleSide}));a.rotation.x=-Math.PI/2+0.42;a.position.set(0,2.05,0.05);a.castShadow=true;g.add(a);scene.add(g);awn.push(g);}
+ let sails;function windmill(x,z){P(CY(1.4,2.1,6,10),0xb0aaa0,x,3,z);const r=new THREE.ConeGeometry(1.9,2.2,10);P(r,0x8a5a30,x,7.1,z);P(BX(0.8,1.3,0.12),0x5a3a20,x,0.65,z+1.95);P(BX(0.5,0.5,0.1),0x2a3040,x,3.5,z+1.7);
+  sails=new THREE.Group();sails.position.set(x,5.6,z+1.75);for(let k=0;k<4;k++){const a=new THREE.Group();a.rotation.z=k*Math.PI/2;const sp=new THREE.Mesh(BX(0.16,4.4,0.1),LM(0x5a3a20));sp.position.y=2.2;a.add(sp);const cl=new THREE.Mesh(BX(0.9,3.4,0.04),LM(0xe8e0cc));cl.position.set(0.5,2.5,0.04);a.add(cl);for(let j=0;j<5;j++){const r2=new THREE.Mesh(BX(0.95,0.05,0.07),LM(0x5a3a20));r2.position.set(0.5,0.9+j*0.8,0.08);a.add(r2);}sails.add(a);}
+  const hub=new THREE.Mesh(CY(0.3,0.3,0.3,8),LM(0x3a2a1a));hub.rotation.x=Math.PI/2;sails.add(hub);sails.traverse(o=>{if(o.isMesh)o.castShadow=true;});scene.add(sails);VILLAGE.sails=sails;}
+ function tree(x,z,sc,pine){if(pine){P(CY(0.16,0.22,1.2,5),0x5a3a20,x,0.6*sc,z);for(let k=0;k<3;k++)P(new THREE.ConeGeometry((1.5-k*0.35)*sc,1.8*sc,7),k%2?0x2e5a2a:0x3a6a30,x,(1.4+k*0.9)*sc,z,R()*6);}
+  else{P(CY(0.18,0.26,1.6,5),0x6a4428,x,0.8*sc,z);P(new THREE.DodecahedronGeometry(1.3*sc,0),R()<0.5?0x4a8a34:0x5a9a3a,x,2.3*sc,z,R()*6);P(new THREE.DodecahedronGeometry(0.9*sc,0),0x6aaa44,x+0.5*sc,2.9*sc,z+0.3*sc,R()*6);}}
+ function fence(x1,z1,x2,z2){const L=Math.hypot(x2-x1,z2-z1),n=Math.max(2,Math.round(L/1.2)),ry=Math.atan2(x2-x1,z2-z1);for(let i=0;i<=n;i++){const t=i/n,x=x1+(x2-x1)*t,z=z1+(z2-z1)*t;if(distPath(x,z)<1.8||nearPad(x,z,1.9))continue;P(BX(0.12,0.9,0.12),0x6a4a2a,x,0.45,z);}
+  for(const h of [0.35,0.7]){const g=BX(0.06,0.08,L);P(g,0x7a5a3a,(x1+x2)/2,h,(z1+z2)/2,ry);}}
+ // ---- place the village (spots are filtered so nothing sits on the path, pads or river) ----
+ const placed=[];const ok=(x,z,r)=>free(x,z,r)&&placed.every(q=>Math.hypot(q[0]-x,q[1]-z)>q[2]+r+0.6);const put=(x,z,r,fn)=>{if(!ok(x,z,r))return false;placed.push([x,z,r]);fn();return true;};
+ VILLAGE.built={cottage:0,chapel:0,well:0,stall:0,windmill:0};
+ const tryNear=(x,z,r,fn,kind)=>{for(let k=0;k<40;k++){const a=R()*6.28,d=k===0?0:0.6+k*0.25;const px=x+Math.cos(a)*d,pz=z+Math.sin(a)*d;if(put(px,pz,r,()=>fn(px,pz))){VILLAGE.built[kind]++;return true;}}return false;};
+ tryNear(6,-15,2.4,(x,z)=>windmill(x,z),'windmill');
+ tryNear(20,-10,3.3,(x,z)=>chapel(x,z,Math.PI*0.95),'chapel');
+ [[-2,4,0.1],[4,-6,-0.2],[14,-5,0.3],[-4,20,3.1],[8,20,2.9],[18,18,-1.6],[-22,-6,1.4],[34,2,-1.5],[-6,-8,0.2]].forEach(([x,z,ry],i)=>tryNear(x,z,2.3,(px,pz)=>cottage(px,pz,ry,0.9+(i%3)*0.1),'cottage'));
+ tryNear(1,7,1.3,(x,z)=>well(x,z),'well');
+ tryNear(-6,6,1.7,(x,z)=>stall(x,z,0.2,'#3a5ac8'),'stall');tryNear(14,11,1.7,(x,z)=>stall(x,z,-0.3,'#c83a3a'),'stall');tryNear(2,18,1.7,(x,z)=>stall(x,z,Math.PI,'#c8a03a'),'stall');
+ fence(-10,1.5,-3,1);fence(8,-2,12,-9);fence(20,14,24,22);fence(-24,-12,-30,-4);fence(-18,14,-10,18);
+ // forest edges (dense at the top-left where the orcs come in) and scattered trees
+ for(let i=0;i<260;i++){let x=(R()-0.5)*110,z=-40+R()*80;const edge=Math.abs(x)>34||z<-23||z>27||(x<-30&&z<-6);if(!edge&&R()<0.85)continue;if(!free(x,z,0.9)&&distPath(x,z)<3)continue;if(!ok(x,z,0.6))continue;placed.push([x,z,0.6]);tree(x,z,0.9+R()*0.6,edge?R()<0.75:R()<0.3);}
+ for(let i=0;i<45;i++){const x=(R()-0.5)*76,z=-24+R()*52;if(!ok(x,z,0.7))continue;placed.push([x,z,0.7]);P(new THREE.DodecahedronGeometry(0.3+R()*0.5,0),0x8a8a86,x,0.15,z,R()*6);}
+ // flowers and grass tufts (instanced)
+ {const n=700,geo=new THREE.BoxGeometry(0.14,0.14,0.14),im=new THREE.InstancedMesh(geo,new THREE.MeshLambertMaterial(),n),m4=new THREE.Matrix4();const cs=[0xffffff,0xf0e040,0xe05050,0xd080e0,0x80a0ff];let k=0;
+  for(let i=0;i<n*3&&k<n;i++){const x=(R()-0.5)*80,z=-26+R()*56;if(distPath(x,z)<2||dRiver(x,z)<RW+0.4||nearPad(x,z,1.8))continue;m4.makeTranslation(x,0.12,z);im.setMatrixAt(k,m4);im.setColorAt(k,col.setHex(cs[(R()*cs.length)|0]));k++;}im.count=k;scene.add(im);}
+ // merge static parts
+ {let n=0;parts.forEach(([g])=>n+=g.attributes.position.count);const Pp=new Float32Array(n*3),C=new Float32Array(n*3);let o=0;
+  for(const [g,hex] of parts){const pa=g.attributes.position;col.setHex(hex);for(let i=0;i<pa.count;i++){Pp[(o+i)*3]=pa.getX(i);Pp[(o+i)*3+1]=pa.getY(i);Pp[(o+i)*3+2]=pa.getZ(i);const j=0.9+R()*0.15;C[(o+i)*3]=col.r*j;C[(o+i)*3+1]=col.g*j;C[(o+i)*3+2]=col.b*j;}o+=pa.count;}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(Pp,3));g.setAttribute('color',new THREE.BufferAttribute(C,3));g.computeVertexNormals();const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true}));m.castShadow=m.receiveShadow=true;m.name='village';scene.add(m);}
+ // the exit: the path simply runs off the bottom edge of the map
+ const ex=PATHPTS[PATHPTS.length-1];VILLAGE.exit={x:ex[0],z:ex[1]};
+ // animate water + windmill on top of the normal day/night cycle
+ const _du=dayUpdate;dayUpdate=function(dt){_du(dt);wu.t.value+=dt;if(sails)sails.rotation.z-=dt*0.9;};
+ renderer.shadowMap.needsUpdate=true;
+})();
+
 // ---- 20_entities.js
 // ---------- orcs ----------
 const ET={
@@ -929,7 +1031,7 @@ const PORTAL=(function(){const CHARGE=60,LAST=15;const P={charge:0,ready:false,p
 
 // ---- 30_game.js
 const $=id=>document.getElementById(id);
-const WIN_WAVE=LEVEL===2?12:20;
+const WIN_WAVE=LEVEL===1?20:12;
 const G={state:'title',mode:'normal',gold:0,lives:0,wave:0,enemies:[],towers:[],queues:[],speed:1,paused:false,time:0,fps:60,stats:{kills:0,built:0,shots:{}},sel:null,best:0};
 try{const o=localStorage.getItem('cs.best');if(o!==null&&localStorage.getItem('orcattack.best')===null)localStorage.setItem('orcattack.best',o);G.best=+localStorage.getItem('orcattack.best')||0;}catch(e){}
 function hpMul(w){return 1.067*(1+0.15*(w-1)+0.016*(w-1)*(w-1));}
@@ -939,6 +1041,8 @@ function waveDef(w){const g=[];const f=Math.floor,c=Math.min(2,1.1+0.04*w),E=3.2
  else{g.push({t:'goblin',n:f((4+w*1.4)*c),gap:0.45,d:0});if(w>=2)g.push({t:'grunt',n:f((1+w)*c),gap:0.8,d:3});if(w>=4)g.push({t:"brute",n:Math.max(1,f((w-2)/1.6)),gap:1.9,d:6});
   if(w%3===0)g.push({t:'goblin',n:f((6+w)*c),gap:0.25,d:10});if(w>=8)g.push({t:'grunt',n:w,gap:0.45,d:13});if(w>=4&&w%2===0)g.push({t:'brute',n:1+f(w/8),gap:2.5,d:16,m:E});if(w===7||w===13||w===17)g.push({t:'warlord',n:1,gap:5,d:18,m:0.35});}
  return g;}
+// River Village: 12 waves, orcs only; elite brutes on 6 & 9, mini-warlord on 10, Warlord boss on 12
+function villageWaveDef(w){return lavaWaveDef(w).map(q=>Object.assign({},q,{t:q.t==='skel'?'goblin':q.t,n:Math.ceil(q.n*1.2)}));}
 // Lava Cave: 12 hand-tuned waves, orcs mixed with skeletons; elite brutes on 6 & 9, mini-warlord on 10, Warlord boss on 12
 function lavaWaveDef(w){const g=[],E=3.2,f=Math.floor;
  g.push({t:'goblin',n:3+f(w*1.4),gap:0.9-Math.min(0.4,w*0.04),d:0});
@@ -951,18 +1055,18 @@ function lavaWaveDef(w){const g=[],E=3.2,f=Math.floor;
  if(w===10)g.push({t:'warlord',n:1,gap:5,d:16,m:0.4});
  if(w===12){g.push({t:'brute',n:2,gap:3,d:12,m:E});g.push({t:'warlord',n:1,gap:9,d:18});}
  return g;}
-function isBoss(w){return LEVEL===2?w===12:w%10===0;}
+function isBoss(w){return LEVEL===1?w%10===0:w===12;}
 function startWave(){if(G.state!=='play')return;const early=G.queues.length>0||G.enemies.some(e=>!e.dead);if(!G.endless&&G.wave>=WIN_WAVE)return;
  if(early){const b=10+G.wave*2;G.gold+=b;floater('Early call +'+b);}
- G.wave++;const mul=hpMul(G.wave);for(const q of (LEVEL===2?lavaWaveDef:waveDef)(G.wave))G.queues.push({t:q.t,n:q.n,gap:q.gap,next:q.d,mul:mul*(q.m||1),el:q.m||1,w:G.wave});
+ G.wave++;const mul=LEVEL===3?hpMul(G.wave*1.45):hpMul(G.wave);for(const q of (LEVEL===2?lavaWaveDef:LEVEL===3?villageWaveDef:waveDef)(G.wave))G.queues.push({t:q.t,n:q.n,gap:q.gap,next:q.d,mul:mul*(q.m||1),el:q.m||1,w:G.wave});
  G.waveOpen=G.waveOpen||{};G.waveOpen[G.wave]=true;
  if(isBoss(G.wave)){banner('BOSS WAVE '+G.wave,'The Orc Warlord approaches!');AU.play('boss');}else if(G.wave%5===0){banner('Wave '+G.wave,'Armoured brutes!');AU.play('horn');}else{banner('Wave '+G.wave);AU.play('horn');}
  AU.setIntensity(isBoss(G.wave)?2:1);ui();}
 function updateWaves(dt){for(let i=G.queues.length-1;i>=0;i--){const q=G.queues[i];q.next-=dt;while(q.next<=0&&q.n>0){spawnEnemy(q.t,q.mul,-q.next*ET[q.t].spd,q.el);q.n--;q.next+=q.gap;}if(q.n<=0)G.queues.splice(i,1);}
  if(G.state==='play'&&G.waveOpen&&G.queues.length===0&&G.enemies.length===0){const ws=Object.keys(G.waveOpen);if(ws.length){G.waveOpen={};const b=30+G.wave*6;G.gold+=b;floater('Wave cleared +'+b);AU.setIntensity(0);saveBest(G.wave);if(LEVEL===2&&!G.unlocked&&G.wave>=6)unlockLava();
-   if(!G.endless&&G.wave>=WIN_WAVE){if(LEVEL===2){nextLevel();return;}gameOver(true);return;}ui();}}}
+   if(!G.endless&&G.wave>=WIN_WAVE){if(LEVEL!==3){nextLevel();return;}gameOver(true);return;}ui();}}}
 function unlockLava(){G.unlocked=true;PORTAL.locked=false;PORTAL.charge=0;PORTAL.ready=false;PORTAL.ui();banner('Wizard Tower & Portal unlocked!','Build wizards and open the portal');AU.play('portalReady');setTimeout(()=>AU.play('coin'),180);if(G.sel&&!$('sheet').classList.contains('hidden'))renderSheet();}
-function nextLevel(){G.state='won';AU.setIntensity(0);AU.play('win');closeSheet();banner('Level 1 complete!','Level 2: The Castle');G.nextAt=performance.now();setTimeout(()=>{location.search='?level=2&go=1';},2000);}
+function nextLevel(){G.state='won';AU.setIntensity(0);AU.play('win');closeSheet();const c=LEVEL===2;banner(c?'Level 1 complete!':'Level 2 complete!',c?'Level 2: The Castle':'Level 3: The River Village');G.nextAt=performance.now();G.nextURL=c?'?level=2&go=1':'?level=3&go=1';if(!window.__noAdvance)setTimeout(()=>{location.search=G.nextURL;},2000);}
 function saveBest(w){if(w>G.best){G.best=w;try{localStorage.setItem('orcattack.best',w);}catch(e){}}}
 function step(dt){G.time+=dt;updateWaves(dt);updateEnemies(dt);updateTowers(dt);updateProjectiles(dt);BLOOD.update(dt);PORTAL.update(dt);}
 function resetGame(endless){PORTAL.reset();BLOOD.D.length=0;BLOOD.update(0);for(const e of G.enemies){scene.remove(e.root);scene.remove(e.bar);POOL[e.type].push(e);}for(const t of [...G.towers])sellTower(t);for(let i=PJ.length-1;i>=0;i--)retire(PJ[i],i);
@@ -1047,7 +1151,7 @@ function frame(now){requestAnimationFrame(frame);const raw=(now-lastT)/1000;last
  uiAcc+=rdt;if(uiAcc>0.15){uiAcc=0;ui();}
  PORTAL.anim(performance.now()/1000);applyCam();DAY.sync();renderer.render(scene,camera);}
 requestAnimationFrame(frame);
-if(/[?&]go=1/.test(location.search)&&LEVEL===1)setTimeout(()=>{begin(false);banner('Level 2: The Castle');try{history.replaceState(null,'','?level=2');}catch(e){}},50);
+if(/[?&]go=1/.test(location.search)&&LEVEL!==2)setTimeout(()=>{begin(false);banner(LEVEL===1?'Level 2: The Castle':'Level 3: The River Village');try{history.replaceState(null,'',LEVEL===1?'?level=2':'?level=3');}catch(e){}},50);
 // ---------- test hooks ----------
 window.__TD={PORTAL,G,PADS,TT,ET,cam,begin,startWave,buildTower,upgradeTower,sellTower,openSheet,closeSheet,applyCam,fitCam,
  sim(sec){let t=sec;while(t>0&&G.state==='play'){const d=Math.min(t,1/30);step(d);t-=d;}ui();},DAY,dayUpdate,
